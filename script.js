@@ -23,11 +23,22 @@ function applyTheme() {
 }
 applyTheme();
 
-// === Элементы (с проверкой) ===
-const user = tg?.initDataUnsafe?.user || { id: 123456789, username: "demo" };
+// === Элементы ===
+const user = tg?.initDataUnsafe?.user || { id: 123456789, username: "demo_user", photo_url: "https://via.placeholder.com/50" };
 const starsCount = document.getElementById("stars-count");
 
-// === Переключение вкладок: Магазин / Обмен / Профиль ===
+// === Отображение пользователя в профиле ===
+document.getElementById("user-id").textContent = user.id;
+document.getElementById("user-username").textContent = user.username || "не задан";
+
+const avatar = document.getElementById("user-avatar");
+if (user.photo_url) {
+  avatar.src = user.photo_url;
+} else {
+  avatar.src = `https://ui-avatars.com/api/?name=${user.first_name || 'User'}&background=random`;
+}
+
+// === Переключение вкладок сверху ===
 document.querySelectorAll(".tab-btn").forEach(button => {
   if (!button) return;
 
@@ -38,6 +49,12 @@ document.querySelectorAll(".tab-btn").forEach(button => {
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
     button.classList.add("active");
+
+    if (button.id === "buy-stars-top") {
+      window.open('https://spend.tg/telegram-stars', '_blank');
+      return;
+    }
+
     const tabId = button.id.replace("tab-", "");
     const tabContent = document.getElementById(tabId);
     if (tabContent) tabContent.classList.add("active");
@@ -58,19 +75,6 @@ async function loadStars() {
   }
 }
 loadStars();
-
-// === Кнопка "Пополнить звёзды" ===
-const buyStarsBtn = document.getElementById("buy-stars-btn");
-if (buyStarsBtn) {
-  buyStarsBtn.addEventListener("click", () => {
-    console.log("Кнопка 'Пополнить' нажата");
-    if (tg && tg.showInvoice) {
-      tg.showInvoice('stars_package_basic');
-    } else {
-      alert("Функция оплаты доступна только в Telegram");
-    }
-  });
-}
 
 // === Покупка в магазине ===
 document.querySelectorAll(".shop-item-btn").forEach(btn => {
