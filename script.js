@@ -1,26 +1,17 @@
-const tg = window.Telegram.WebApp;
-tg.ready();
+// === Инициализация Telegram WebApp ===
+const tg = window.Telegram?.WebApp;
 
-// === Элементы ===
-const user = tg.initDataUnsafe.user;
-const starsCount = document.getElementById("stars-count");
-
-// === Переключение вкладок сверху ===
-document.querySelectorAll(".tab-btn").forEach(button => {
-  button.addEventListener("click", () => {
-    // Убираем актив у всех
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-
-    // Добавляем текущему
-    button.classList.add("active");
-    const tabId = button.id.replace("tab-", "");
-    document.getElementById(tabId).classList.add("active");
-  });
-});
+if (tg) {
+  tg.ready();
+  console.log("Telegram WebApp готов");
+} else {
+  console.error("Telegram WebApp не доступен. Открой в Telegram.");
+}
 
 // === Применение темы ===
 function applyTheme() {
+  if (!tg) return;
+
   const theme = tg.themeParams;
   const dark = tg.colorScheme === 'dark';
   document.documentElement.style.setProperty('--tg-bg', theme.bg_color || (dark ? '#1a1a1a' : '#fff'));
@@ -32,22 +23,54 @@ function applyTheme() {
 }
 applyTheme();
 
-// === Загрузка баланса ===
+// === Элементы (с проверкой) ===
+const user = tg?.initDataUnsafe?.user || { id: 123456789, username: "demo" };
+const starsCount = document.getElementById("stars-count");
+
+// === Переключение вкладок: Магазин / Обмен / Профиль ===
+document.querySelectorAll(".tab-btn").forEach(button => {
+  if (!button) return;
+
+  button.addEventListener("click", () => {
+    console.log("Кнопка нажата:", button.id);
+
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+
+    button.classList.add("active");
+    const tabId = button.id.replace("tab-", "");
+    const tabContent = document.getElementById(tabId);
+    if (tabContent) tabContent.classList.add("active");
+  });
+});
+
+// === Загрузка баланса звёзд ===
 async function loadStars() {
+  if (!starsCount) return;
+
   try {
     const res = await fetch('https://bupsiserver.onrender.com/api/stars/' + user.id);
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
   } catch (err) {
+    console.error("Ошибка загрузки баланса", err);
     starsCount.textContent = "—";
   }
 }
 loadStars();
 
 // === Кнопка "Пополнить звёзды" ===
-document.getElementById("buy-stars-btn").addEventListener("click", () => {
-  tg.showInvoice('stars_package_basic');
-});
+const buyStarsBtn = document.getElementById("buy-stars-btn");
+if (buyStarsBtn) {
+  buyStarsBtn.addEventListener("click", () => {
+    console.log("Кнопка 'Пополнить' нажата");
+    if (tg && tg.showInvoice) {
+      tg.showInvoice('stars_package_basic');
+    } else {
+      alert("Функция оплаты доступна только в Telegram");
+    }
+  });
+}
 
 // === Покупка в магазине ===
 document.querySelectorAll(".shop-item-btn").forEach(btn => {
@@ -57,40 +80,51 @@ document.querySelectorAll(".shop-item-btn").forEach(btn => {
       price: parseInt(btn.dataset.price)
     };
 
-    const res = await fetch('https://bupsiserver.onrender.com/api/buy-item', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, item })
-    });
+    try {
+      const res = await fetch('https://bupsiserver.onrender.com/api/buy-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, item })
+      });
 
-    const result = await res.json();
-    if (result.success) {
-      tg.showAlert(`Куплено: ${item.name}!`);
-      loadStars();
-    } else {
-      tg.showAlert("Ошибка: " + result.error);
+      const result = await res.json();
+      if (result.success) {
+        tg?.showAlert?.(`Куплено: ${item.name}!`);
+        loadStars();
+      } else {
+        tg?.showAlert?.("Ошибка: " + result.error);
+      }
+    } catch (err) {
+      tg?.showAlert?.("Не удалось соединиться с сервером");
     }
   });
 });
 
 // === Начать обмен ===
-document.getElementById("start-exchange-by-username").addEventListener("click", async () => {
-  const targetUsername = prompt("Введите username:", "").trim();
-  if (!targetUsername) return alert("Введите username");
+const startExchangeBtn = document.getElementById("start-exchange-by-username");
+if (startExchangeBtn) {
+  startExchangeBtn.addEventListener("click", async () => {
+    const targetUsername = prompt("Введите username:", "").trim();
+    if (!targetUsername) return tg?.showAlert?.("Введите username");
 
-  const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fromId: user.id,
-      fromUsername: user.username || `user${user.id}`,
-      targetUsername
-    })
+    try {
+      const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromId: user.id,
+          fromUsername: user.username || `user${user.id}`,
+          targetUsername
+        })
+      });
+
+      const result = await res.json();
+      tg?.showAlert?.(result.success ? `Запрос отправлен @${targetUsername}` : "Ошибка: " + result.error);
+    } catch (err) {
+      tg?.showAlert?.("Ошибка соединения с сервером");
+    }
   });
-
-  const result = await res.json();
-  alert(result.success ? `Запрос отправлен @${targetUsername}` : "Ошибка: " + result.error);
-});
+}
 
 // === Вторичные вкладки (в профиле) ===
 document.querySelectorAll(".tabs-secondary button").forEach(btn => {
