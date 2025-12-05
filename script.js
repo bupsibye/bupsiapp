@@ -2,11 +2,10 @@
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
-  tg.expand(); // Расширяет на весь экран
   tg.ready();
+  tg.expand();
 } else {
-  // Не в Telegram — можно оставить пусто или показать подсказку
-  console.warn("Mini App должна открываться через Telegram");
+  console.warn("Откройте Mini App через Telegram");
 }
 
 // === Применение темы ===
@@ -22,54 +21,38 @@ function applyTheme() {
 }
 applyTheme();
 
-// === === === ЭЛЕМЕНТЫ DOM === === ===
+// === Получение пользователя ===
+const user = tg?.initDataUnsafe?.user || null;
+
+// === Элементы DOM ===
 const starsCount = document.getElementById("stars-count");
 const userIdEl = document.getElementById("user-id");
 const usernameEl = document.getElementById("user-username");
 const avatarEl = document.getElementById("user-avatar");
 const startExchangeBtn = document.getElementById("start-exchange-by-username");
 
-// === Получение пользователя из initData ===
-let user = null;
+// === Отображение пользователя ===
+if (user && userIdEl && usernameEl && avatarEl) {
+  userIdEl.textContent = user.id;
+  usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
 
-try {
-  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-    user = tg.initDataUnsafe.user;
-    console.log("Пользователь получен:", user);
-  } else {
-    console.warn("initData не содержит user");
-  }
-} catch (err) {
-  console.error("Ошибка при получении пользователя:", err);
-}
-
-// === Показ информации о пользователе ===
-if (user) {
-  if (userIdEl) userIdEl.textContent = user.id;
-  
-  if (usernameEl) {
-    usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
-  }
-
-  if (avatarEl) {
-    if (user.photo_url) {
-      avatarEl.src = `${user.photo_url}&s=150`; // увеличим размер
-      avatarEl.onerror = () => {
-        avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
-      };
-    } else {
+  if (user.photo_url) {
+    avatarEl.src = `${user.photo_url}&s=150`;
+    avatarEl.onerror = () => {
       avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
-    }
+    };
+  } else {
+    avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
   }
 } else {
-  // Режим отладки: если не в Telegram
+  // Режим отладки
   if (userIdEl) userIdEl.textContent = "—";
   if (usernameEl) usernameEl.textContent = "не задан";
   if (avatarEl) avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
-  console.log("Пользователь не доступен — открыт не через Telegram Mini App");
+  console.log("Пользователь не определён — откройте через Telegram");
 }
 
-// === Переключение вкладок сверху ===
+// === Переключение вкладок ===
 document.querySelectorAll(".tab-btn").forEach(button => {
   button.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -88,13 +71,13 @@ document.querySelectorAll(".tab-btn").forEach(button => {
   });
 });
 
-// === Загрузка баланса звёзд ===
+// === Загрузка баланса ===
 async function loadStars() {
   if (!starsCount || !user) return;
 
   try {
     const res = await fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`);
-    if (!res.ok) throw new Error("Сервер вернул ошибку");
+    if (!res.ok) throw new Error("Сервер не ответил");
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
   } catch (err) {
@@ -102,9 +85,9 @@ async function loadStars() {
     starsCount.textContent = "—";
   }
 }
-loadStars(); // Загружаем при старте
+loadStars();
 
-// === Покупка в магазине ===
+// === Покупка ===
 document.querySelectorAll(".shop-item-btn").forEach(btn => {
   btn.addEventListener("click", async () => {
     if (!user) return tg?.showAlert?.("Ошибка: откройте через Telegram");
@@ -125,13 +108,15 @@ document.querySelectorAll(".shop-item-btn").forEach(btn => {
       tg?.showAlert?.(result.success ? `Куплено: ${item.name}!` : "Ошибка: " + result.error);
       if (result.success) loadStars();
     } catch (err) {
-      tg?.showAlert?.("Не удалось подключиться к серверу");
+      tg?.showAlert?.("Ошибка подключения к серверу");
     }
   });
 });
 
-// === Начать обмен по username ===
+// === Обмен по username ===
 if (startExchangeBtn && user) {
+  startExchangeBtn.disabled = false;
+  startExchangeBtn.style.opacity = "1";
   startExchangeBtn.addEventListener("click", async () => {
     const targetUsername = prompt("Введите username пользователя:", "").trim();
     if (!targetUsername) return tg?.showAlert?.("Введите username");
@@ -150,14 +135,13 @@ if (startExchangeBtn && user) {
       const result = await res.json();
       tg?.showAlert?.(result.success ? `Запрос отправлен @${targetUsername}` : "Ошибка: " + result.error);
     } catch (err) {
-      tg?.showAlert?.("Ошибка сети. Проверьте соединение.");
+      tg?.showAlert?.("Ошибка сети");
     }
   });
-} else if (startExchangeBtn && !user) {
+} else if (startExchangeBtn) {
   startExchangeBtn.disabled = true;
-  startExchangeBtn.textContent = "Обмен недоступен";
   startExchangeBtn.style.opacity = "0.5";
-  console.warn("Кнопка обмена отключена — нет пользователя");
+  startExchangeBtn.textContent = "Обмен недоступен";
 }
 
 // === Вторичные вкладки (в профиле) ===
