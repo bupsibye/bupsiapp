@@ -1,284 +1,60 @@
-/* === ПЕРЕМЕННЫЕ ТЕМЫ === */
-:root {
-  --tg-bg: #ffffff;
-  --tg-text: #000000;
-  --tg-hint: #888888;
-  --tg-accent: #0088cc;
-  --tg-secondary-bg: #f0f0f0;
-  --tg-border: #dddddd;
-}
-
-.tg-dark {
-  --tg-bg: #1a1a1a;
-  --tg-text: #ffffff;
-  --tg-hint: #999999;
-  --tg-accent: #00a8e8;
-  --tg-secondary-bg: #2c2c2c;
-  --tg-border: #444444;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  background: var(--tg-bg);
-  color: var(--tg-text);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  min-height: 100vh;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-}
-
-.container {
-  min-height: 100vh;
+/* === Вторичные вкладки === */
+.tabs-secondary {
   display: flex;
-  flex-direction: column;
-}
-
-/* === ШАПКА: вкладки + баланс + аватар === */
-.header {
-  display: flex;
-  align-items: center;
-  background: var(--tg-secondary-bg);
+  gap: 4px;
+  margin: 16px 0;
   border-bottom: 1px solid var(--tg-border);
-  padding: 0 10px;
-  gap: 10px;
 }
 
-/* === Вкладки сверху === */
-.tabs {
-  display: flex;
-  gap: 4px;
-  flex: 1;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 14px;
+.tabs-secondary button {
+  padding: 8px 12px;
   background: transparent;
   border: none;
   color: var(--tg-hint);
   cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s ease;
+  font-size: 14px;
 }
 
-.tab .icon {
-  width: 18px;
-  height: 18px;
-  fill: var(--tg-hint);
-  transition: fill 0.2s;
-}
-
-.tab.active {
+.tabs-secondary button.tab-active,
+.tabs-secondary button:hover {
   color: var(--tg-accent);
-  font-weight: 600;
+  border-bottom: 2px solid var(--tg-accent);
 }
 
-.tab.active .icon {
-  fill: var(--tg-accent);
-}
-
-/* === Баланс звёзд === */
-.stars-balance {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 16px;
-  color: var(--tg-accent);
-  font-weight: 500;
-  padding: 8px 12px;
-  background: var(--tg-secondary-bg);
-  border-radius: 10px;
-  margin-left: 10px;
-}
-
-/* === Аватар пользователя === */
-.user-tab {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-  border: 2px solid var(--tg-accent);
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.user-tab:hover {
-  transform: scale(1.05);
-}
-
-.user-tab img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* === Основное содержимое === */
-.main-content {
-  flex: 1;
-  padding: 20px;
-}
-
-.tab-content {
+.tab-pane {
   display: none;
 }
 
-.tab-content.active {
+.tab-pane.active {
   display: block;
 }
 
-/* === Магазин === */
-.shop-items {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-top: 16px;
+/* === История === */
+#history-list {
+  margin-top: 10px;
 }
 
-.item {
-  background: var(--tg-secondary-bg);
-  padding: 12px;
-  border-radius: 12px;
-  text-align: center;
-  width: 120px;
-  border: 1px solid var(--tg-border);
-}
-
-.item img {
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
-  margin-bottom: 8px;
-}
-
-.item p {
-  font-size: 14px;
-  margin-bottom: 8px;
-  color: var(--tg-text);
-}
-
-/* === Кнопки === */
-.btn {
-  display: block;
-  width: 100%;
+.history-item {
   padding: 10px;
-  background: linear-gradient(135deg, var(--tg-accent), #00598c);
-  color: white;
-  border: none;
+  margin-bottom: 8px;
+  background: var(--tg-secondary-bg);
   border-radius: 8px;
   font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  line-height: 1.4;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+.history-item::before {
+  margin-right: 6px;
+  font-weight: bold;
 }
 
-#exchange-link-output {
-  margin: 12px 0;
-  padding: 10px;
-  background: var(--tg-secondary-bg);
-  border: 1px dashed var(--tg-accent);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--tg-accent);
-}
+.history-item.type-stars_in::before { content: "🟢"; }
+.history-item.type-stars_out::before { content: "🔴"; }
+.history-item.type-exchange::before { content: "🔄"; }
+.history-item.type-shop::before { content: "🛒"; }
 
-#exchange-link-output a {
-  color: var(--tg-accent);
-  text-decoration: underline;
-}
-
-/* === Сетка подарков (инвентарь) === */
-.gifts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 12px;
-  margin: 12px 0;
-}
-
-.gift-item {
-  background: var(--tg-secondary-bg);
-  border: 2px solid var(--tg-border);
-  border-radius: 10px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+.history-item .date {
   font-size: 12px;
-  color: var(--tg-text);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.gift-item:hover {
-  transform: translateY(-2px);
-  border-color: var(--tg-accent);
-}
-
-.gift-item img {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 8px;
-  margin-bottom: 6px;
-}
-
-.gift-item.empty {
-  border-style: dashed;
   color: var(--tg-hint);
-  background: var(--tg-bg);
-}
-
-.gift-item.empty::before {
-  content: "+";
-  font-size: 24px;
-  margin-bottom: 4px;
-}
-
-.gift-item.empty:hover {
-  background: var(--tg-secondary-bg);
-}
-
-/* === Инвентарь (открывается по клику) === */
-#inventory {
-  padding: 20px;
-  background: var(--tg-secondary-bg);
-  border-top: 1px solid var(--tg-border);
-  display: none;
-}
-
-#inventory.active {
-  display: block;
-}
-
-/* === Адаптивность === */
-@media (max-width: 768px) {
-  .header {
-    padding: 0 8px;
-  }
-  .tab span {
-    font-size: 12px;
-  }
-  .shop-items {
-    justify-content: center;
-  }
+  margin-top: 4px;
 }
