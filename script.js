@@ -1,18 +1,16 @@
-// === Инициализация ===
+// === Инициализация Telegram WebApp ===
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
   tg.ready();
-  console.log("Telegram WebApp готов");
 } else {
-  console.error("Telegram WebApp не доступен");
+  console.warn("Telegram WebApp недоступен — Mini App должна открываться через Telegram");
 }
 
 // === Применение темы ===
 function applyTheme() {
-  if (!tg) return;
-  const theme = tg.themeParams;
-  const dark = tg.colorScheme === 'dark';
+  const theme = tg?.themeParams || {};
+  const dark = tg?.colorScheme === 'dark';
   document.documentElement.style.setProperty('--tg-bg', theme.bg_color || (dark ? '#1a1a1a' : '#fff'));
   document.documentElement.style.setProperty('--tg-text', theme.text_color || (dark ? '#fff' : '#000'));
   document.documentElement.style.setProperty('--tg-hint', theme.hint_color || (dark ? '#999' : '#888'));
@@ -22,33 +20,37 @@ function applyTheme() {
 }
 applyTheme();
 
-// === Пользователь ===
-const user = tg?.initDataUnsafe?.user;
+// === Получение пользователя ===
+const user = tg?.initDataUnsafe?.user || null;
 
-if (!user) {
-  alert("Откройте Mini App через бота в Telegram");
-} else {
-  console.log("Пользователь:", user);
-}
-
+// === Элементы профиля ===
 const starsCount = document.getElementById("stars-count");
+const userIdEl = document.getElementById("user-id");
+const usernameEl = document.getElementById("user-username");
+const avatarEl = document.getElementById("user-avatar");
 
-// === Отображение пользователя в профиле ===
+// === Показ информации о пользователе ===
 if (user) {
-  document.getElementById("user-id").textContent = user.id;
-  document.getElementById("user-username").textContent = user.username ? `@${user.username}` : "не задан";
-
-  const avatar = document.getElementById("user-avatar");
-  if (user.photo_url) {
-    avatar.src = user.photo_url + "&s=100";
-  } else {
-    avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
+  if (userIdEl) userIdEl.textContent = user.id;
+  if (usernameEl) {
+    usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
+  }
+  if (avatarEl) {
+    if (user.photo_url) {
+      avatarEl.src = `${user.photo_url}&s=150`;
+    } else {
+      avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
+    }
   }
 } else {
-  document.querySelector(".user-info-card").innerHTML = "<p>Ошибка: откройте через бота</p>";
+  console.log("Пользователь не определён — открыт не через Telegram");
+  // Можно скрыть блок или оставить демо-режим
+  if (userIdEl) userIdEl.textContent = "—";
+  if (usernameEl) usernameEl.textContent = "не задан";
+  if (avatarEl) avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
 }
 
-// === Переключение вкладок ===
+// === Переключение вкладок сверху ===
 document.querySelectorAll(".tab-btn").forEach(button => {
   button.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -56,6 +58,7 @@ document.querySelectorAll(".tab-btn").forEach(button => {
 
     button.classList.add("active");
 
+    // Кнопка "Звёзды" — открывает сайт
     if (button.id === "buy-stars-top") {
       window.open('https://spend.tg/telegram-stars', '_blank');
       return;
@@ -67,14 +70,16 @@ document.querySelectorAll(".tab-btn").forEach(button => {
   });
 });
 
-// === Загрузка баланса ===
+// === Загрузка баланса звёзд ===
 async function loadStars() {
   if (!starsCount || !user) return;
+
   try {
     const res = await fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`);
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
   } catch (err) {
+    console.error("Ошибка загрузки баланса", err);
     starsCount.textContent = "—";
   }
 }
@@ -83,6 +88,8 @@ loadStars();
 // === Покупка в магазине ===
 document.querySelectorAll(".shop-item-btn").forEach(btn => {
   btn.addEventListener("click", async () => {
+    if (!user) return tg?.showAlert?.("Ошибка: откройте через Telegram");
+
     const item = {
       name: btn.dataset.name,
       price: parseInt(btn.dataset.price)
@@ -94,17 +101,20 @@ document.querySelectorAll(".shop-item-btn").forEach(btn => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, item })
       });
+
       const result = await res.json();
-      tg?.showAlert?.(result.success ? `Куплено: ${item.name}` : "Ошибка: " + result.error);
+      tg?.showAlert?.(result.success ? `Куплено: ${item.name}!` : "Ошибка: " + result.error);
       if (result.success) loadStars();
     } catch (err) {
-      tg?.showAlert?.("Ошибка соединения");
+      tg?.showAlert?.("Не удалось подключиться к серверу");
     }
   });
 });
 
-// === Начать обмен ===
+// === Начать обмен по username ===
 document.getElementById("start-exchange-by-username")?.addEventListener("click", async () => {
+  if (!user) return tg?.showAlert?.("Только в Telegram");
+
   const targetUsername = prompt("Введите username:", "").trim();
   if (!targetUsername) return tg?.showAlert?.("Введите username");
 
@@ -114,14 +124,15 @@ document.getElementById("start-exchange-by-username")?.addEventListener("click",
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fromId: user.id,
-        fromUsername: user.username,
+        fromUsername: user.username || `user${user.id}`,
         targetUsername
       })
     });
+
     const result = await res.json();
     tg?.showAlert?.(result.success ? `Запрос отправлен @${targetUsername}` : "Ошибка: " + result.error);
   } catch (err) {
-    tg?.showAlert?.("Ошибка: не удалось отправить");
+    tg?.showAlert?.("Ошибка сети");
   }
 });
 
