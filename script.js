@@ -1,9 +1,23 @@
 const tg = window.Telegram.WebApp;
 tg.ready();
 
+// === Элементы ===
 const user = tg.initDataUnsafe.user;
 const starsCount = document.getElementById("stars-count");
-const historyList = document.getElementById("history-list");
+
+// === Переключение вкладок сверху ===
+document.querySelectorAll(".tab-btn").forEach(button => {
+  button.addEventListener("click", () => {
+    // Убираем актив у всех
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+
+    // Добавляем текущему
+    button.classList.add("active");
+    const tabId = button.id.replace("tab-", "");
+    document.getElementById(tabId).classList.add("active");
+  });
+});
 
 // === Применение темы ===
 function applyTheme() {
@@ -18,10 +32,10 @@ function applyTheme() {
 }
 applyTheme();
 
-// === Загрузка баланса звёзд ===
+// === Загрузка баланса ===
 async function loadStars() {
   try {
-    const res = await fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`);
+    const res = await fetch('https://bupsiserver.onrender.com/api/stars/' + user.id);
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
   } catch (err) {
@@ -30,44 +44,12 @@ async function loadStars() {
 }
 loadStars();
 
-// === Кнопка "Купить звёзды" ===
+// === Кнопка "Пополнить звёзды" ===
 document.getElementById("buy-stars-btn").addEventListener("click", () => {
   tg.showInvoice('stars_package_basic');
 });
 
-// === Переключение вкладок в инвентаре ===
-document.querySelectorAll(".tabs-secondary button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tabs-secondary button").forEach(b => b.classList.remove("tab-active"));
-    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-
-    btn.classList.add("tab-active");
-    document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
-
-    if (btn.getAttribute("data-tab") === "history") {
-      loadHistory();
-    }
-  });
-});
-
-// === Загрузка истории ===
-async function loadHistory() {
-  try {
-    const res = await fetch(`https://bupsiserver.onrender.com/api/history/${user.id}`);
-    const history = await res.json();
-
-    historyList.innerHTML = history.reverse().map(item => `
-      <div class="history-item type-${item.type}">
-        <div>${item.text}</div>
-        <div class="date">${item.date}</div>
-      </div>
-    `).join('');
-  } catch (err) {
-    historyList.innerHTML = '<div>Не удалось загрузить историю</div>';
-  }
-}
-
-// === Магазин: покупка ===
+// === Покупка в магазине ===
 document.querySelectorAll(".shop-item-btn").forEach(btn => {
   btn.addEventListener("click", async () => {
     const item = {
@@ -85,9 +67,37 @@ document.querySelectorAll(".shop-item-btn").forEach(btn => {
     if (result.success) {
       tg.showAlert(`Куплено: ${item.name}!`);
       loadStars();
-      loadHistory();
     } else {
       tg.showAlert("Ошибка: " + result.error);
     }
+  });
+});
+
+// === Начать обмен ===
+document.getElementById("start-exchange-by-username").addEventListener("click", async () => {
+  const targetUsername = prompt("Введите username:", "").trim();
+  if (!targetUsername) return alert("Введите username");
+
+  const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fromId: user.id,
+      fromUsername: user.username || `user${user.id}`,
+      targetUsername
+    })
+  });
+
+  const result = await res.json();
+  alert(result.success ? `Запрос отправлен @${targetUsername}` : "Ошибка: " + result.error);
+});
+
+// === Вторичные вкладки (в профиле) ===
+document.querySelectorAll(".tabs-secondary button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs-secondary button").forEach(b => b.classList.remove("tab-active"));
+    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+    btn.classList.add("tab-active");
+    document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
   });
 });
