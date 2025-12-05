@@ -1,138 +1,60 @@
 const tg = window.Telegram.WebApp;
 tg.ready();
 
-// Элементы
-const tabs = document.querySelectorAll(".tab");
-const mainContents = document.querySelectorAll(".main-content > .tab-content");
-const userTab = document.getElementById("user-tab");
-const inventory = document.getElementById("inventory");
-const userAvatar = document.getElementById("user-avatar");
-const buyStarsBtn = document.getElementById("buy-stars-btn");
-const generateLinkBtn = document.getElementById("generate-exchange-link");
-const exchangeLinkOutput = document.getElementById("exchange-link-output");
-const userGiftsGrid = document.getElementById("user-gifts-grid");
-const exchangeGiftsGrid = document.getElementById("exchange-gifts-grid");
-const withdrawGiftBtn = document.getElementById("withdraw-gift-btn");
-const starsCount = document.getElementById("stars-count");
+const user = tg.initDataUnsafe.user;
+const startExchangeBtn = document.getElementById("start-exchange-by-username");
 
-let user = null;
-let myGifts = JSON.parse(localStorage.getItem("myGifts") || "[]");
-let stars = parseInt(localStorage.getItem("stars") || "100"); // тестовый баланс
+if (startExchangeBtn) {
+  startExchangeBtn.addEventListener("click", async () => {
+    const targetUsername = prompt("Введите username пользователя:", "").trim();
+    if (!targetUsername) return alert("Введите username");
 
-// === Применение темы ===
-function applyTheme() {
-  const theme = tg.themeParams;
-  const dark = tg.colorScheme === 'dark';
-  document.documentElement.style.setProperty('--tg-bg', theme.bg_color || (dark ? '#1a1a1a' : '#fff'));
-  document.documentElement.style.setProperty('--tg-text', theme.text_color || (dark ? '#fff' : '#000'));
-  document.documentElement.style.setProperty('--tg-hint', theme.hint_color || (dark ? '#999' : '#888'));
-  document.documentElement.style.setProperty('--tg-accent', theme.accent_text_color || '#0088cc');
-  document.documentElement.style.setProperty('--tg-secondary-bg', dark ? '#2c2c2c' : '#f0f0f0');
-  document.documentElement.style.setProperty('--tg-border', dark ? '#444' : '#ddd');
-}
+    const fromUsername = user.username || `user${user.id}`;
 
-// === Инициализация ===
-function init() {
-  applyTheme();
-
-  user = tg.initDataUnsafe.user;
-  if (user && user.photo_url) {
-    userAvatar.src = user.photo_url;
-  }
-
-  // Показываем баланс звёзд
-  starsCount.textContent = stars;
-
-  renderGiftGrids();
-  setupEventListeners();
-}
-
-// === Отрисовка сетки подарков ===
-function renderGiftGrids() {
-  [userGiftsGrid, exchangeGiftsGrid].forEach(grid => {
-    grid.innerHTML = "";
-
-    if (myGifts.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "gift-item empty";
-      grid.appendChild(empty);
-    } else {
-      myGifts.forEach(gift => {
-        const item = document.createElement("div");
-        item.className = "gift-item";
-        item.innerHTML = `
-          <img src="https://via.placeholder.com/60/CCCCCC/999999?text=🎁" alt="Gift">
-          <span>${gift.name.length > 6 ? gift.name.slice(0, 6) + "..." : gift.name}</span>
-        `;
-        grid.appendChild(item);
-      });
-    }
-  });
-}
-
-// === Слушатели ===
-function setupEventListeners() {
-  // Переключение вкладок
-  tabs.forEach(tab => {
-    tab.addEventListener("click", () => {
-      const tabId = tab.getAttribute("data-tab");
-
-      if (tabId === "stars") {
-        tg.openLink("https://spend.tg/telegram-stars", { try_instant_view: false });
-        return;
-      }
-
-      tabs.forEach(t => t.classList.remove("active"));
-      mainContents.forEach(c => c.classList.remove("active"));
-
-      tab.classList.add("active");
-      document.getElementById(tabId)?.classList.add("active");
+    const response = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fromId: user.id, fromUsername, targetUsername })
     });
-  });
 
-  // Клик по аватару — инвентарь
-  userTab.addEventListener("click", () => {
-    inventory.classList.toggle("active");
-    if (inventory.classList.contains("active")) {
-      renderGiftGrids();
-    }
-  });
-
-  // Генерация ссылки
-  generateLinkBtn.addEventListener("click", () => {
-    const link = `https://t.me/YourBotNameBot?startapp=exchange_${user?.id}`;
-    exchangeLinkOutput.innerHTML = `
-      <p>Отправьте ссылку другу:</p>
-      <a href="${link}" target="_blank">${link.slice(-10)}...</a>
-    `;
-  });
-
-  // Вывод подарка
-  withdrawGiftBtn.addEventListener("click", () => {
-    if (myGifts.length === 0) {
-      tg.showAlert("Нет подарков для вывода");
-      return;
-    }
-
-    if (stars < 25) {
-      tg.showAlert("⚠️ Недостаточно звёзд: нужно 25");
-      return;
-    }
-
-    tg.showConfirm("Оплатить 25 ⭐ за вывод подарка?", async (ok) => {
-      if (ok) {
-        stars -= 25;
-        localStorage.setItem("stars", stars);
-        starsCount.textContent = stars;
-
-        const gift = myGifts.pop();
-        localStorage.setItem("myGifts", JSON.stringify(myGifts));
-
-        renderGiftGrids();
-        tg.showAlert(`🎁 "${gift.name}" отправлен в ваш чат с ботом!`);
-      }
-    });
+    const result = await response.json();
+    alert(result.success ? `Запрос отправлен @${targetUsername}` : "Ошибка: " + result.error);
   });
 }
 
-init();
+// === Инициализация сессии обмена ===
+async function initExchangeSession() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get("startapp");
+  if (!sessionId?.startsWith("ex_")) return;
+
+  const res = await fetch(`https://bupsiserver.onrender.com/api/session/${sessionId}`);
+  const session = await res.json();
+  if (session.error) return;
+
+  const exchangeContainer = document.getElementById("exchange");
+  if (!exchangeContainer) return;
+
+  exchangeContainer.innerHTML = `
+    <h3>🔄 Обмен с @${session.fromId === user.id ? session.toId : session.fromUsername}</h3>
+    <input type="text" id="gift-input" placeholder="Ваш подарок">
+    <button id="send-gift-btn" class="btn">Отправить</button>
+    <div id="status">Ожидаем подарок...</div>
+  `;
+
+  document.getElementById("send-gift-btn").addEventListener("click", async () => {
+    const gift = document.getElementById("gift-input").value.trim();
+    if (!gift) return alert("Введите подарок");
+
+    await fetch('https://bupsiserver.onrender.com/api/exchange/add-gift', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, userId: user.id, giftName: gift })
+    });
+
+    document.getElementById("status").textContent = "Подарок отправлен!";
+    document.getElementById("send-gift-btn").disabled = true;
+  });
+}
+
+initExchangeSession();
