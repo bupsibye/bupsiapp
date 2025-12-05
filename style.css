@@ -199,3 +199,38 @@ h2, h3 {
   color: var(--tg-hint);
   margin-top: 4px;
 }
+
+/* === Кнопка "Звёзды" === */
+#buy-stars-top {
+  color: #ffcc00 !important;
+  font-weight: 600;
+}
+
+#buy-stars-top::before {
+  content: "⭐";
+  margin-right: 4px;
+}
+
+/* === Карточка пользователя === */
+.user-info-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--tg-secondary-bg);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.user-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--tg-accent);
+}
+
+.user-details {
+  line-height: 1.5;
+}
