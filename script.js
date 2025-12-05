@@ -4,8 +4,9 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
+  tg.MainButton.setText("Открыть профиль");
 } else {
-  console.warn("Откройте Mini App через Telegram");
+  console.warn("⚠️ Telegram WebApp SDK не загружен. Добавьте <script src='https://telegram.org/js/telegram-web-app.js'></script>");
 }
 
 // === Применение темы ===
@@ -22,7 +23,18 @@ function applyTheme() {
 applyTheme();
 
 // === Получение пользователя ===
-const user = tg?.initDataUnsafe?.user || null;
+let user = null;
+
+try {
+  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+    user = tg.initDataUnsafe.user;
+    console.log("✅ Пользователь получен:", user);
+  } else {
+    console.warn("❌ initData не содержит user. Откройте через кнопку бота.");
+  }
+} catch (err) {
+  console.error("❌ Ошибка при получении пользователя:", err);
+}
 
 // === Элементы DOM ===
 const starsCount = document.getElementById("stars-count");
@@ -36,20 +48,19 @@ if (user && userIdEl && usernameEl && avatarEl) {
   userIdEl.textContent = user.id;
   usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
 
-  if (user.photo_url) {
-    avatarEl.src = `${user.photo_url}&s=150`;
-    avatarEl.onerror = () => {
-      avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
-    };
-  } else {
-    avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
-  }
+  const photoUrl = user.photo_url 
+    ? `${user.photo_url}&s=150` 
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
+
+  avatarEl.src = photoUrl;
+  avatarEl.onerror = () => {
+    avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
+  };
 } else {
-  // Режим отладки
+  console.log("❌ Пользователь не доступен — откройте через Telegram");
   if (userIdEl) userIdEl.textContent = "—";
   if (usernameEl) usernameEl.textContent = "не задан";
   if (avatarEl) avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
-  console.log("Пользователь не определён — откройте через Telegram");
 }
 
 // === Переключение вкладок ===
@@ -81,39 +92,13 @@ async function loadStars() {
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
   } catch (err) {
-    console.error("Ошибка загрузки баланса", err);
+    console.error("❌ Ошибка загрузки баланса", err);
     starsCount.textContent = "—";
   }
 }
 loadStars();
 
-// === Покупка ===
-document.querySelectorAll(".shop-item-btn").forEach(btn => {
-  btn.addEventListener("click", async () => {
-    if (!user) return tg?.showAlert?.("Ошибка: откройте через Telegram");
-
-    const item = {
-      name: btn.dataset.name,
-      price: parseInt(btn.dataset.price)
-    };
-
-    try {
-      const res = await fetch('https://bupsiserver.onrender.com/api/buy-item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, item })
-      });
-
-      const result = await res.json();
-      tg?.showAlert?.(result.success ? `Куплено: ${item.name}!` : "Ошибка: " + result.error);
-      if (result.success) loadStars();
-    } catch (err) {
-      tg?.showAlert?.("Ошибка подключения к серверу");
-    }
-  });
-});
-
-// === Обмен по username ===
+// === Кнопка обмена ===
 if (startExchangeBtn && user) {
   startExchangeBtn.disabled = false;
   startExchangeBtn.style.opacity = "1";
@@ -133,15 +118,15 @@ if (startExchangeBtn && user) {
       });
 
       const result = await res.json();
-      tg?.showAlert?.(result.success ? `Запрос отправлен @${targetUsername}` : "Ошибка: " + result.error);
+      tg?.showAlert?.(result.success ? `✅ Запрос отправлен @${targetUsername}` : `❌ Ошибка: ${result.error}`);
     } catch (err) {
-      tg?.showAlert?.("Ошибка сети");
+      tg?.showAlert?.("❌ Ошибка сети. Проверьте подключение.");
     }
   });
 } else if (startExchangeBtn) {
   startExchangeBtn.disabled = true;
   startExchangeBtn.style.opacity = "0.5";
-  startExchangeBtn.textContent = "Обмен недоступен";
+  startExchangeBtn.textContent = "Обмен: недоступен (откройте через бота)";
 }
 
 // === Вторичные вкладки (в профиле) ===
