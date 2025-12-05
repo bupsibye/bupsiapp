@@ -12,11 +12,13 @@
 
 <body>
   <!-- Верхняя панель с кнопками -->
-  <header class="app-header">
-    <button id="tab-shop" class="tab-btn active">🎁 Магазин</button>
-    <button id="tab-exchange" class="tab-btn">🔄 Обмен</button>
-    <button id="tab-inventory" class="tab-btn">📦 Профиль</button>
-  </header>
+<header class="app-header">
+  <button id="tab-shop" class="tab-btn">🎁 Магазин</button>
+  <button id="tab-exchange" class="tab-btn">🔄 Обмен</button>
+  <button id="tab-inventory" class="tab-btn">📦 Профиль</button>
+  <button id="buy-stars-top" class="tab-btn">⭐ Купить звёзды</button>
+</header>
+
 
   <!-- Основной контент -->
   <main class="main-content">
@@ -46,32 +48,35 @@
       <div id="exchange-area"></div>
     </div>
 
-    <!-- Профиль -->
-    <div id="inventory" class="tab-content">
-      <h2>👤 Ваш профиль</h2>
-      <div class="profile-stats">
-        <div class="stat-item">
-          <span>⭐ Баланс:</span>
-          <span id="stars-count">—</span>
-        </div>
-        <button id="buy-stars-btn" class="btn">Пополнить звёзды</button>
-      </div>
+<!-- Профиль -->
+<div id="inventory" class="tab-content">
+  <h2>👤 Ваш профиль</h2>
 
-      <div class="tabs-secondary">
-        <button class="tab-active" data-tab="inventory-items">Инвентарь</button>
-        <button data-tab="history">История</button>
-      </div>
-
-      <div id="inventory-items" class="tab-pane active">
-        <div id="user-gifts-grid" class="gifts-grid"></div>
-        <button id="withdraw-gift-btn" class="btn">Вывести подарок</button>
-      </div>
-
-      <div id="history" class="tab-pane">
-        <h3>📜 История действий</h3>
-        <div id="history-list"></div>
-      </div>
+  <!-- Информация о пользователе -->
+  <div class="user-info-card">
+    <img id="user-avatar" src="" alt="Avatar" class="user-avatar">
+    <div class="user-details">
+      <p><strong>ID:</strong> <span id="user-id"></span></p>
+      <p><strong>Username:</strong> <span id="user-username"></span></p>
     </div>
+  </div>
+
+  <div class="tabs-secondary">
+    <button class="tab-active" data-tab="inventory-items">Инвентарь</button>
+    <button data-tab="history">История</button>
+  </div>
+
+  <div id="inventory-items" class="tab-pane active">
+    <div id="user-gifts-grid" class="gifts-grid"></div>
+    <button id="withdraw-gift-btn" class="btn">Вывести подарок</button>
+  </div>
+
+  <div id="history" class="tab-pane">
+    <h3>📜 История действий</h3>
+    <div id="history-list"></div>
+  </div>
+</div>
+
   </main>
 
   <script src="script.js"></script>
