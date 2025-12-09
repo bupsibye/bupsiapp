@@ -6,20 +6,21 @@
   <title>Bupsi</title>
   <link rel="stylesheet" href="style.css">
   
-  <!-- Обязательно -->
+  <!-- Обязательно: SDK Telegram -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
-
-
 <body>
   <!-- Верхняя панель с кнопками -->
-<header class="app-header">
-  <button id="tab-shop" class="tab-btn">🎁 Магазин</button>
-  <button id="tab-exchange" class="tab-btn">🔄 Обмен</button>
-  <button id="tab-inventory" class="tab-btn">📦 Профиль</button>
-  <button id="buy-stars-top" class="tab-btn">⭐ Купить звёзды</button>
-</header>
-
+  <header class="app-header">
+    <button id="tab-shop" class="tab-btn">🎁 Магазин</button>
+    <button id="tab-exchange" class="tab-btn">🔄 Обмен</button>
+    <button id="tab-inventory" class="tab-btn">📦 Профиль</button>
+    <button id="buy-stars-top" class="tab-btn">⭐ Купить звёзды</button>
+    <!-- Баланс звёзд -->
+    <div style="margin-left: auto; padding: 10px; font-weight: bold; color: gold; text-shadow: 0 0 2px #000;">
+      <span id="stars-count">—</span> ⭐
+    </div>
+  </header>
 
   <!-- Основной контент -->
   <main class="main-content">
@@ -49,37 +50,37 @@
       <div id="exchange-area"></div>
     </div>
 
-<!-- Профиль -->
-<div id="inventory" class="tab-content">
-  <h2>👤 Ваш профиль</h2>
+    <!-- Профиль -->
+    <div id="inventory" class="tab-content">
+      <h2>👤 Ваш профиль</h2>
 
-  <!-- Информация о пользователе -->
-  <div class="user-info-card">
-    <img id="user-avatar" src="" alt="Avatar" class="user-avatar">
-    <div class="user-details">
-      <p><strong>ID:</strong> <span id="user-id"></span></p>
-      <p><strong>Username:</strong> <span id="user-username"></span></p>
+      <!-- Информация о пользователе -->
+      <div class="user-info-card">
+        <img id="user-avatar" src="" alt="Avatar" class="user-avatar">
+        <div class="user-details">
+          <p><strong>ID:</strong> <span id="user-id"></span></p>
+          <p><strong>Username:</strong> <span id="user-username"></span></p>
+        </div>
+      </div>
+
+      <div class="tabs-secondary">
+        <button class="tab-active" data-tab="inventory-items">Инвентарь</button>
+        <button data-tab="history">История</button>
+      </div>
+
+      <div id="inventory-items" class="tab-pane active">
+        <div id="user-gifts-grid" class="gifts-grid"></div>
+        <button id="withdraw-gift-btn" class="btn">Вывести подарок</button>
+      </div>
+
+      <div id="history" class="tab-pane">
+        <h3>📜 История действий</h3>
+        <div id="history-list"></div>
+      </div>
     </div>
-  </div>
-
-  <div class="tabs-secondary">
-    <button class="tab-active" data-tab="inventory-items">Инвентарь</button>
-    <button data-tab="history">История</button>
-  </div>
-
-  <div id="inventory-items" class="tab-pane active">
-    <div id="user-gifts-grid" class="gifts-grid"></div>
-    <button id="withdraw-gift-btn" class="btn">Вывести подарок</button>
-  </div>
-
-  <div id="history" class="tab-pane">
-    <h3>📜 История действий</h3>
-    <div id="history-list"></div>
-  </div>
-</div>
-
   </main>
 
-  <script src="script.js"></script>
+  <!-- Скрипты в конце с defer для правильной загрузки -->
+  <script src="script.js" defer></script>
 </body>
 </html>
