@@ -1,42 +1,26 @@
+// === Логи для отладки ===
+console.log("🚀 Mini App: запуск");
+
+// Инициализация Telegram
 const tg = window.Telegram?.WebApp;
 
-// Инициализация Telegram Mini App
 if (tg) {
   tg.ready();
   tg.expand();
-  tg.BackButton.hide(); // Скроем, если не в обмене
+  console.log("✅ Telegram WebApp: готов");
 } else {
-  console.error("❌ SDK не загружен");
+  console.error("❌ Telegram WebApp: не загружен");
 }
 
 // Пользователь из Telegram
 const user = tg?.initDataUnsafe?.user || null;
-
-// Автообновление баланса
-function updateStars() {
-  if (!user) return;
-  fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`)
-    .then(res => res.json())
-    .then(data => {
-      const el = document.getElementById("stars-count");
-      if (el) el.textContent = data.stars || 0;
-    })
-    .catch(() => {
-      const el = document.getElementById("stars-count");
-      if (el) el.textContent = "—";
-    });
-}
+console.log("👤 Пользователь:", user);
 
 // При загрузке DOM
 document.addEventListener('DOMContentLoaded', () => {
-  // Включаем кнопки
-  document.querySelectorAll('button, .tab-btn').forEach(btn => {
-    btn.style.pointerEvents = 'auto';
-    btn.style.opacity = '1';
-    btn.disabled = false;
-  });
+  console.log("DOMContentLoaded: старт");
 
-  // === Проверка: пришли по ссылке с startapp (например, /startapp=exchange_abc123)
+  // === Проверка: пришли по ссылке с startapp
   const initData = tg?.initData || '';
   const urlParams = new URLSearchParams(initData);
   const startParam = urlParams.get('start_param');
@@ -57,13 +41,14 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         } catch (err) {
           tg.showAlert('❌ Не удалось подключиться к серверу');
+          console.error("Ошибка принятия обмена:", err);
         }
       }
-      tg.close(); // Закрываем WebApp
+      tg.close();
     });
   }
 
-  // === Проверка: открыли с exchange_id (например, ?exchange_id=abc123)
+  // === Проверка: открыли с exchange_id
   const urlSearch = new URLSearchParams(window.location.search);
   const exchangeId = urlSearch.get('exchange_id');
   const mainContent = document.querySelector('.main-content');
@@ -87,10 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    // Здесь можно загрузить данные сессии
-    document.getElementById('exchange-from').textContent = '@user1 (заглушка)';
-
-    // Принять обмен
     document.getElementById('accept-exchange').onclick = async () => {
       try {
         const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${exchangeId}`);
@@ -108,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
       window.history.back();
     };
 
-    // Отклонить
     document.getElementById('decline-exchange').onclick = () => {
       tg.showAlert('Вы отклонили обмен');
       window.history.back();
@@ -119,28 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // === Если не обмен — стандартный интерфейс ===
-
-  // Отображение профиля
-  if (user) {
-    const userIdEl = document.getElementById("user-id");
-    const usernameEl = document.getElementById("user-username");
-    const avatarEl = document.getElementById("user-avatar");
-
-    if (userIdEl) userIdEl.textContent = user.id;
-    if (usernameEl) usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
-    if (avatarEl) {
-      avatarEl.src = user.photo_url
-        ? `${user.photo_url}&s=150`
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&size=100&background=random`;
-      avatarEl.onerror = () => avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
-    }
-
-    // Загружаем баланс
-    updateStars();
-  }
-
-  // Переключение вкладок
+  // === Переключение вкладок ===
   document.querySelectorAll(".tab-btn").forEach(button => {
     button.addEventListener("click", () => {
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -158,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Кнопка "Начать обмен"
+  // === Кнопка "Начать обмен" ===
   const startExchangeBtn = document.getElementById("start-exchange-by-username");
   if (startExchangeBtn && user) {
     startExchangeBtn.addEventListener("click", async () => {
@@ -166,6 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!targetUsername) return tg?.showAlert?.("Введите username");
 
       try {
+        console.log("📤 Отправка запроса на обмен:", { fromId: user.id, targetUsername });
         const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -176,26 +136,39 @@ document.addEventListener('DOMContentLoaded', () => {
           })
         });
 
+        console.log("📡 Статус ответа:", res.status);
         const result = await res.json();
+        console.log("📦 Результат:", result);
+
         tg?.showAlert?.(result.success 
           ? `✅ Запрос отправлен @${targetUsername}` 
           : `❌ Ошибка: ${result.error}`
         );
       } catch (err) {
-        tg?.showAlert?.("❌ Ошибка соединения с сервером.");
+        console.error("💥 Ошибка fetch:", err);
+        tg?.showAlert?.("❌ Ошибка соединения с сервером. Проверь интернет.");
       }
     });
   }
 
-  // === Вторичные вкладки (в профиле) ===
-  document.querySelectorAll(".tabs-secondary button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tabs-secondary button").forEach(b => b.classList.remove("tab-active"));
-      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-      btn.classList.add("tab-active");
-      document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
-    });
-  });
+  // === Обновление баланса ===
+  function updateStars() {
+    if (!user) return;
+    fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        const el = document.getElementById("stars-count");
+        if (el) el.textContent = data.stars || 0;
+      })
+      .catch(err => {
+        console.error("Ошибка загрузки баланса:", err);
+        const el = document.getElementById("stars-count");
+        if (el) el.textContent = "—";
+      });
+  }
+
+  // Первый раз
+  updateStars();
 
   // === Загрузка истории ===
   async function loadHistory() {
@@ -225,52 +198,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelector('[data-tab="history"]').addEventListener('click', loadHistory);
 
-  // === Покупка в магазине ===
-  document.querySelectorAll('.shop-item-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const name = btn.dataset.name;
-      const price = parseInt(btn.dataset.price);
-
-      tg.showConfirm(`Купить "${name}" за ${price} ⭐?`, async (ok) => {
-        if (!ok) return;
-
-        try {
-          // Проверим баланс
-          const res = await fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`);
-          const data = await res.json();
-
-          if (data.stars < price) {
-            tg.showAlert('❌ Недостаточно звёзд!');
-            return;
-          }
-
-          // Здесь будет запрос к /api/buy (в будущем)
-          tg.showAlert(`✅ Вы купили "${name}"!`);
-          updateStars(); // обновим баланс (условно)
-
-        } catch (err) {
-          tg.showAlert('❌ Ошибка покупки');
-        }
-      });
+  // === Вторичные вкладки (в профиле) ===
+  document.querySelectorAll(".tabs-secondary button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tabs-secondary button").forEach(b => b.classList.remove("tab-active"));
+      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+      btn.classList.add("tab-active");
+      document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
     });
   });
-
-  // === Отображение инвентаря (пример) ===
-  const userGifts = [
-    { name: "Плюшевый кот", img: "https://via.placeholder.com/40/FFD700/000?text=🐱" },
-    { name: "Золотая звезда", img: "https://via.placeholder.com/40/87CEEB/000?text=⭐" }
-  ];
-
-  function renderInventory() {
-    const grid = document.getElementById('user-gifts-grid');
-    if (!grid) return;
-    grid.innerHTML = userGifts.map(gift => `
-      <div class="gift-item">
-        <img src="${gift.img}" alt="${gift.name}">
-        <div>${gift.name}</div>
-      </div>
-    `).join('');
-  }
-
-  document.querySelector('[data-tab="inventory-items"]').addEventListener('click', renderInventory);
 });
