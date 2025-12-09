@@ -36,6 +36,24 @@ try {
   console.error('❌ Ошибка при получении пользователя:', err);
 }
 
+// === Подтверждение диалога с ботом (чтобы можно было писать) ===
+if (user) {
+  console.log("👋 Открываем Mini App — подтверждаем диалог с ботом");
+  fetch(`https://bupsiserver.onrender.com/api/hello/${user.id}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        console.log("✅ Диалог подтверждён — можно обмениваться");
+      } else {
+        tg?.showAlert?.("⚠️ Не удалось подключиться. Напишите /start боту.");
+      }
+    })
+    .catch(err => {
+      console.error("❌ Ошибка подтверждения диалога:", err);
+      console.warn("💡 Если ошибка, убедитесь, что server.js обновлён");
+    });
+}
+
 // === DOM-элементы ===
 const starsCount = document.getElementById("stars-count");
 const userIdEl = document.getElementById("user-id");
@@ -46,14 +64,12 @@ const startExchangeBtn = document.getElementById("start-exchange-by-username");
 // === Отображение профиля ===
 if (user && userIdEl) {
   userIdEl.textContent = user.id;
-  console.log('🆔 ID отображён:', user.id);
 } else if (userIdEl) {
   userIdEl.textContent = "—";
 }
 
 if (user && usernameEl) {
   usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
-  console.log('👤 Username:', user.username || "не задан");
 } else if (usernameEl) {
   usernameEl.textContent = "не задан";
 }
@@ -66,9 +82,7 @@ if (user && avatarEl) {
   avatarEl.src = photoUrl;
   avatarEl.onerror = () => {
     avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
-    console.warn('🖼️ Аватарка не загрузилась, использована заглушка');
   };
-  console.log('🖼️ Аватарка:', photoUrl);
 } else if (avatarEl) {
   avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
 }
@@ -90,30 +104,22 @@ document.querySelectorAll(".tab-btn").forEach(button => {
     const tab = document.getElementById(tabId);
     if (tab) {
       tab.classList.add("active");
-      console.log(`📱 Переключено на вкладку: ${tabId}`);
     }
   });
 });
 
 // === Загрузка баланса звёзд ===
 async function loadStars() {
-  if (!starsCount || !user) {
-    console.warn('⚠️ Не могу загрузить баланс: нет starsCount или user');
-    return;
-  }
+  if (!starsCount || !user) return;
 
   try {
     const url = `https://bupsiserver.onrender.com/api/stars/${user.id}`;
-    console.log('⬇️ Запрос баланса:', url);
-
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
-
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
-    console.log('⭐ Баланс загружен:', data.stars);
   } catch (err) {
-    console.error('❌ Ошибка загрузки баланса:', err);
+    console.error("❌ Ошибка загрузки баланса:", err);
     starsCount.textContent = "—";
   }
 }
@@ -125,8 +131,6 @@ if (startExchangeBtn) {
     startExchangeBtn.disabled = false;
     startExchangeBtn.style.opacity = "1";
     startExchangeBtn.addEventListener("click", async () => {
-      console.log('🔄 Кнопка "Начать обмен" нажата');
-
       const targetUsername = prompt("Введите username пользователя:", "").trim();
       if (!targetUsername) {
         tg?.showAlert?.("Введите username");
@@ -134,8 +138,6 @@ if (startExchangeBtn) {
       }
 
       try {
-        console.log('📤 Отправка запроса на обмен:', { fromId: user.id, targetUsername });
-
         const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -147,27 +149,19 @@ if (startExchangeBtn) {
         });
 
         const result = await res.json();
-        console.log('📥 Ответ от сервера:', result);
-
         tg?.showAlert?.(result.success 
           ? `✅ Запрос отправлен @${targetUsername}` 
           : `❌ Ошибка: ${result.error}`
         );
-
-        if (result.success) {
-          console.log(`✅ Приглашение отправлено @${targetUsername}`);
-        }
       } catch (err) {
-        console.error('❌ Ошибка сети:', err);
+        console.error("❌ Ошибка сети:", err);
         tg?.showAlert?.("Ошибка сети. Проверьте подключение.");
       }
     });
-    console.log('✅ Кнопка обмена: активна');
   } else {
     startExchangeBtn.disabled = true;
     startExchangeBtn.style.opacity = "0.5";
     startExchangeBtn.textContent = "Обмен: недоступен";
-    console.warn('❌ Кнопка обмена отключена — пользователь не определён');
   }
 }
 
