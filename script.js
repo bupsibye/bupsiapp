@@ -1,191 +1,157 @@
-// === Инициализация Telegram WebApp ===
-const tg = window.Telegram?.WebApp;
+const express = require('express');
+const bodyParser = require('body-parser');
+const TelegramBot = require('node-telegram-bot-api');
 
-if (tg) {
-  tg.ready();
-  tg.expand();
-  console.log('✅ Telegram WebApp: готов');
-} else {
-  console.warn('❌ Telegram WebApp не доступен. Добавьте <script src="https://telegram.org/js/telegram-web-app.js"></script>');
-}
+const app = express();
+app.use(bodyParser.json());
+app.use(express.static('.'));
 
-// === Применение темы ===
-function applyTheme() {
-  const theme = tg?.themeParams || {};
-  const dark = tg?.colorScheme === 'dark';
-  document.documentElement.style.setProperty('--tg-bg', theme.bg_color || (dark ? '#1a1a1a' : '#fff'));
-  document.documentElement.style.setProperty('--tg-text', theme.text_color || (dark ? '#fff' : '#000'));
-  document.documentElement.style.setProperty('--tg-hint', theme.hint_color || (dark ? '#999' : '#888'));
-  document.documentElement.style.setProperty('--tg-accent', theme.accent_text_color || '#0088cc');
-  document.documentElement.style.setProperty('--tg-secondary-bg', dark ? '#2c2c2c' : '#f0f0f0');
-  document.documentElement.style.setProperty('--tg-border', dark ? '#444' : '#ddd');
-}
-applyTheme();
-
-// === Получение пользователя ===
-let user = null;
-
-try {
-  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-    user = tg.initDataUnsafe.user;
-    console.log('✅ Пользователь получен:', user);
-  } else {
-    console.warn('❌ initData не содержит user. Откройте Mini App через кнопку бота.');
+// === ТОКЕН ===
+const BOT_TOKEN = process.env.BOT_TOKEN || '8212274685:AAEN_jjb3hUnVN9CxdR9lSrG416yQXmk4Tk';
+const bot = new TelegramBot(BOT_TOKEN, {
+  polling: {
+    interval: 1000,
+    autoStart: true,
+    params: { timeout: 10 }
   }
-} catch (err) {
-  console.error('❌ Ошибка при получении пользователя:', err);
-}
+});
 
-// === Проверка на exchange_id в URL ===
-const urlParams = new URLSearchParams(window.location.search);
-const exchangeId = urlParams.get('exchange_id');
-if (exchangeId) {
-  console.log('📦 Открыт с сессией обмена:', exchangeId);
+// === ХРАНИЛИЩЕ ===
+const userStars = new Map();
+const userHistory = new Map();
+const greetedUsers = new Set();
+const exchangeSessions = new Map(); // хранит активные сессии обмена
 
-  // Показываем экран обмена (пример)
-  const content = document.querySelector('.content');
-  if (content) {
-    content.innerHTML = `
-      <div style="text-align: center; padding: 20px;">
-        <h2>🔄 Обмен</h2>
-        <p>Загрузка сессии обмена...</p>
-        <button onclick="tg.backButton.show()">Назад</button>
-      </div>
-    `;
+// === Подтверждение диалога при первом открытии Mini App ===
+app.get('/api/hello/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId);
+  console.log(`👋 Диалог запрошен для: ${userId}`);
+
+  if (greetedUsers.has(userId)) {
+    return res.json({ success: true });
   }
 
-  // Здесь можно загрузить данные сессии через API
-  // fetch(`/api/exchange/${exchangeId}`) → обновить интерфейс
-
-  // Включаем кнопку "Назад"
-  tg.BackButton.show();
-  tg.BackButton.onClick(() => {
-    window.history.back();
-  });
-}
-
-// === Подтверждение диалога с ботом ===
-if (user) {
-  console.log("👋 Подтверждаем диалог при открытии Mini App");
-  fetch(`https://bupsiserver.onrender.com/api/hello/${user.id}`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        console.log("✅ Диалог подтверждён");
-      } else {
-        tg?.showAlert?.("⚠️ Напишите /start боту");
-      }
-    })
-    .catch(err => {
-      console.error("❌ Ошибка при подтверждении диалога:", err);
+  try {
+    await bot.sendMessage(userId, `✅ Добро пожаловать! Диалог подтверждён — вы можете использовать обмен.`, {
+      parse_mode: 'Markdown'
     });
-}
+    greetedUsers.add(userId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(`❌ Не могу написать ${userId}:`, err.response?.body);
+    res.json({ success: false, error: "Напишите /start боту" });
+  }
+});
 
-// === DOM-элементы ===
-const starsCount = document.getElementById("stars-count");
-const userIdEl = document.getElementById("user-id");
-const usernameEl = document.getElementById("user-username");
-const avatarEl = document.getElementById("user-avatar");
-const startExchangeBtn = document.getElementById("start-exchange-by-username");
+// === API: баланс ===
+app.get('/api/stars/:userId', (req, res) => {
+  const stars = userStars.get(parseInt(req.params.userId)) || 0;
+  res.json({ stars });
+});
 
-// === Отображение профиля ===
-if (user && userIdEl) {
-  userIdEl.textContent = user.id;
-}
+// === API: начать обмен ===
+app.post('/api/start-exchange-by-username', async (req, res) => {
+  const { fromId, fromUsername, targetUsername } = req.body;
+  const cleanTarget = targetUsername.replace(/^@/, '').toLowerCase();
 
-if (user && usernameEl) {
-  usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
-}
+  let toId;
+  try {
+    const chat = await bot.getChat(`@${cleanTarget}`);
+    toId = chat.id;
+  } catch (err) {
+    return res.json({ 
+      success: false, 
+      error: "Пользователь не найден. Убедитесь, что он писал /start боту" 
+    });
+  }
 
-if (user && avatarEl) {
-  const photoUrl = user.photo_url 
-    ? `${user.photo_url}&s=150` 
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
+  try {
+    await bot.sendMessage(toId, "Тест", { disable_notification: true });
+    await bot.deleteMessage(toId, (await bot.sendMessage(toId, "Тест отправки")).message_id);
+  } catch (err) {
+    return res.json({ 
+      success: false, 
+      error: "Бот не может писать этому пользователю" 
+    });
+  }
 
-  avatarEl.src = photoUrl;
-  avatarEl.onerror = () => {
-    avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
+  // Генерация ID сессии
+  const sessionId = `ex_${Date.now()}_${fromId}`;
+  exchangeSessions.set(sessionId, {
+    fromId,
+    toId,
+    fromUsername: fromUsername || `user${fromId}`,
+    status: 'pending',
+    fromConfirmed: false,
+    toConfirmed: false,
+    giftFrom: null,
+    giftTo: null
+  });
+
+  // Кнопки
+  const keyboard = {
+    inline_keyboard: [
+      [
+        {
+          text: "✅ Принять",
+          web_app: { url: `https://bupsiapp.vercel.app?exchange_id=${sessionId}` }
+        },
+        {
+          text: "❌ Отклонить",
+          callback_data: `decline_exchange_${sessionId}`
+        }
+      ]
+    ]
   };
-} else if (avatarEl) {
-  avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
-}
 
-// === Переключение вкладок ===
-document.querySelectorAll(".tab-btn").forEach(button => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  try {
+    await bot.sendMessage(toId, `📩 У вас новое предложение на обмен от *${fromUsername || 'Пользователь'}*`, {
+      reply_markup: keyboard,
+      parse_mode: 'Markdown'
+    });
 
-    button.classList.add("active");
+    res.json({ success: true, sessionId });
+  } catch (err) {
+    console.error("❌ Ошибка отправки приглашения:", err);
+    res.json({ success: false, error: "Не удалось отправить приглашение" });
+  }
+});
 
-    if (button.id === "buy-stars-top") {
-      window.open('https://spend.tg/telegram-stars', '_blank');
+// === Обработка кнопки "Отклонить" ===
+bot.on('callback_query', async (query) => {
+  const data = query.data;
+  const fromId = query.from.id;
+
+  if (data.startsWith('decline_exchange_')) {
+    const sessionId = data.split('_').slice(3).join('_');
+    const session = exchangeSessions.get(sessionId);
+
+    if (!session) {
+      await bot.answerCallbackQuery(query.id);
       return;
     }
 
-    const tabId = button.id.replace("tab-", "");
-    const tab = document.getElementById(tabId);
-    if (tab) tab.classList.add("active");
-  });
+    // Удаляем сессию
+    exchangeSessions.delete(sessionId);
+
+    // Уведомляем инициатора
+    try {
+      await bot.sendMessage(session.fromId, `❌ Пользователь не принял ваше предложение на обмен.`);
+    } catch (err) {
+      console.error(`❌ Не могу уведомить инициатора ${session.fromId}`);
+    }
+
+    // Подтверждаем нажатие
+    await bot.answerCallbackQuery(query.id, { text: 'Вы отклонили обмен' });
+    await bot.editMessageText('❌ Вы отклонили обмен.', {
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id
+    });
+  }
 });
 
-// === Загрузка баланса ===
-async function loadStars() {
-  if (!starsCount || !user) return;
-
-  try {
-    const res = await fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`);
-    if (!res.ok) throw new Error("Сервер не ответил");
-    const data = await res.json();
-    starsCount.textContent = data.stars || 0;
-  } catch (err) {
-    console.error("❌ Ошибка загрузки баланса", err);
-    starsCount.textContent = "—";
-  }
-}
-loadStars();
-
-// === Кнопка обмена ===
-if (startExchangeBtn && user) {
-  startExchangeBtn.disabled = false;
-  startExchangeBtn.style.opacity = "1";
-
-  startExchangeBtn.addEventListener("click", async () => {
-    const targetUsername = prompt("Введите username пользователя:", "").trim();
-    if (!targetUsername) return tg?.showAlert?.("Введите username");
-
-    try {
-      const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromId: user.id,
-          fromUsername: user.username || `user${user.id}`,
-          targetUsername
-        })
-      });
-
-      const result = await res.json();
-      tg?.showAlert?.(result.success 
-        ? `✅ Запрос отправлен @${targetUsername}` 
-        : `❌ Ошибка: ${result.error}`
-      );
-    } catch (err) {
-      tg?.showAlert?.("❌ Ошибка сети. Проверьте подключение.");
-    }
-  });
-} else if (startExchangeBtn) {
-  startExchangeBtn.disabled = true;
-  startExchangeBtn.style.opacity = "0.5";
-  startExchangeBtn.textContent = "Обмен: недоступен";
-}
-
-// === Вторичные вкладки (в профиле) ===
-document.querySelectorAll(".tabs-secondary button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tabs-secondary button").forEach(b => b.classList.remove("tab-active"));
-    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-    btn.classList.add("tab-active");
-    document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
-  });
+// === Запуск сервера ===
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
