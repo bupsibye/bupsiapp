@@ -1,70 +1,50 @@
-// === 1. Инициализация Telegram WebApp ===
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
-  tg.ready();    // Это КРИТИЧЕСКИ важно
-  tg.expand();   // Раскрыть на весь экран
+  tg.ready();
+  tg.expand();
+  console.log("✅ WebApp: готов");
 } else {
-  console.error("❌ Telegram SDK не загружен. Добавьте <script src='https://telegram.org/js/telegram-web-app.js'>");
+  console.error("❌ SDK не загружен");
 }
 
-// === 2. Получаем пользователя ===
 const user = tg?.initDataUnsafe?.user || null;
+console.log("👤 Пользователь:", user);
 
-// === 3. Включаем все кнопки (убираем блокировку Telegram) ===
 document.addEventListener('DOMContentLoaded', () => {
-  // Убираем CSS-блокировку
-  const buttons = document.querySelectorAll('button, .tab-btn');
-  buttons.forEach(btn => {
+  console.log("DOMContentLoaded: запуск");
+
+  // Включаем все кнопки
+  document.querySelectorAll('button, .tab-btn').forEach(btn => {
     btn.style.pointerEvents = 'auto';
     btn.style.opacity = '1';
     btn.disabled = false;
+    console.log("✅ Кнопка активирована:", btn.id || btn.textContent.slice(0, 20));
   });
 
-  // === 4. Показываем профиль, если есть пользователь ===
-  if (user) {
-    const userIdEl = document.getElementById("user-id");
-    const usernameEl = document.getElementById("user-username");
-    const avatarEl = document.getElementById("user-avatar");
-
-    if (userIdEl) userIdEl.textContent = user.id;
-    if (usernameEl) usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
-    if (avatarEl) {
-      avatarEl.src = user.photo_url 
-        ? `${user.photo_url}&s=150` 
-        : `https://ui-avatars.com/api/?name=${user.first_name}&size=100&background=random`;
-      avatarEl.onerror = () => avatarEl.src = "https://via.placeholder.com/50/ccc/000?text=👤";
-    }
-  }
-
-  // === 5. Кнопка "Купить звёзды" — открывает ссылку ===
-  const buyStarsBtn = document.getElementById("buy-stars-top");
-  if (buyStarsBtn) {
-    buyStarsBtn.onclick = () => {
-      window.open('https://spend.tg/telegram-stars', '_blank');
-    };
-  }
-
-  // === 6. Кнопка "Профиль" — переключает вкладку ===
+  // === Кнопка "Профиль" ===
   const profileTabBtn = document.getElementById("tab-profile");
   const profileTab = document.getElementById("profile");
 
-  if (profileTabBtn && profileTab) {
+  if (profileTabBtn) {
+    console.log("✅ Кнопка 'Профиль' найдена");
     profileTabBtn.onclick = () => {
-      // Сброс всех вкладок
+      console.log("👉 Кнопка 'Профиль' нажата");
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-      
-      // Активируем профиль
       profileTabBtn.classList.add("active");
-      profileTab.classList.add("active");
+      if (profileTab) profileTab.classList.add("active");
     };
+  } else {
+    console.error("❌ Кнопка 'tab-profile' НЕ найдена");
   }
 
-  // === 7. Кнопка "Обмен" — отправка запроса ===
+  // === Кнопка "Обмен" ===
   const exchangeBtn = document.getElementById("start-exchange-by-username");
-  if (exchangeBtn && user) {
+  if (exchangeBtn) {
+    console.log("✅ Кнопка 'Обмен' найдена");
     exchangeBtn.onclick = async () => {
+      console.log("👉 Кнопка 'Обмен' нажата");
       const username = prompt("Введите username:", "").trim();
       if (!username) return alert("Введите username");
 
@@ -85,17 +65,51 @@ document.addEventListener('DOMContentLoaded', () => {
           : `❌ Ошибка: ${data.error}`
         );
       } catch (err) {
+        console.error("❌ Ошибка обмена:", err);
         alert("❌ Ошибка сети");
       }
     };
+  } else {
+    console.error("❌ Кнопка 'start-exchange-by-username' НЕ найдена");
   }
 
-  // === 8. Загрузка баланса ===
+  // === Кнопка "Купить звёзды" ===
+  const buyStarsBtn = document.getElementById("buy-stars-top");
+  if (buyStarsBtn) {
+    buyStarsBtn.onclick = () => {
+      console.log("👉 Кнопка 'Купить звёзды' нажата");
+      window.open('https://spend.tg/telegram-stars', '_blank');
+    };
+  }
+
+  // === Баланс ===
   const starsCount = document.getElementById("stars-count");
   if (starsCount && user) {
     fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`)
       .then(res => res.json())
-      .then(data => starsCount.textContent = data.stars || 0)
-      .catch(() => starsCount.textContent = "—");
+      .then(data => {
+        starsCount.textContent = data.stars || 0;
+        console.log("⭐ Баланс:", data.stars);
+      })
+      .catch(err => {
+        console.error("❌ Ошибка баланса:", err);
+        starsCount.textContent = "—";
+      });
+  }
+
+  // === Профиль ===
+  if (user) {
+    const userIdEl = document.getElementById("user-id");
+    const usernameEl = document.getElementById("user-username");
+    const avatarEl = document.getElementById("user-avatar");
+
+    if (userIdEl) userIdEl.textContent = user.id;
+    if (usernameEl) usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
+    if (avatarEl) {
+      avatarEl.src = user.photo_url 
+        ? `${user.photo_url}&s=150` 
+        : `https://ui-avatars.com/api/?name=${user.first_name}&size=100&background=random`;
+      avatarEl.onerror = () => avatarEl.src = "https://via.placeholder.com/50/ccc/000?text=👤";
+    }
   }
 });
