@@ -22,7 +22,7 @@ function applyTheme() {
 }
 applyTheme();
 
-// === Получение пользователя из Telegram ===
+// === Получение пользователя ===
 let user = null;
 
 try {
@@ -30,27 +30,54 @@ try {
     user = tg.initDataUnsafe.user;
     console.log('✅ Пользователь получен:', user);
   } else {
-    console.warn('❌ initData не содержит user. Откройте Mini App через кнопку в боте.');
+    console.warn('❌ initData не содержит user. Откройте Mini App через кнопку бота.');
   }
 } catch (err) {
   console.error('❌ Ошибка при получении пользователя:', err);
 }
 
-// === Подтверждение диалога с ботом (чтобы можно было писать) ===
+// === Проверка на exchange_id в URL ===
+const urlParams = new URLSearchParams(window.location.search);
+const exchangeId = urlParams.get('exchange_id');
+if (exchangeId) {
+  console.log('📦 Открыт с сессией обмена:', exchangeId);
+
+  // Показываем экран обмена (пример)
+  const content = document.querySelector('.content');
+  if (content) {
+    content.innerHTML = `
+      <div style="text-align: center; padding: 20px;">
+        <h2>🔄 Обмен</h2>
+        <p>Загрузка сессии обмена...</p>
+        <button onclick="tg.backButton.show()">Назад</button>
+      </div>
+    `;
+  }
+
+  // Здесь можно загрузить данные сессии через API
+  // fetch(`/api/exchange/${exchangeId}`) → обновить интерфейс
+
+  // Включаем кнопку "Назад"
+  tg.BackButton.show();
+  tg.BackButton.onClick(() => {
+    window.history.back();
+  });
+}
+
+// === Подтверждение диалога с ботом ===
 if (user) {
-  console.log("👋 Открываем Mini App — подтверждаем диалог с ботом");
+  console.log("👋 Подтверждаем диалог при открытии Mini App");
   fetch(`https://bupsiserver.onrender.com/api/hello/${user.id}`)
     .then(res => res.json())
     .then(data => {
       if (data.success) {
-        console.log("✅ Диалог подтверждён — можно обмениваться");
+        console.log("✅ Диалог подтверждён");
       } else {
-        tg?.showAlert?.("⚠️ Не удалось подключиться. Напишите /start боту.");
+        tg?.showAlert?.("⚠️ Напишите /start боту");
       }
     })
     .catch(err => {
-      console.error("❌ Ошибка подтверждения диалога:", err);
-      console.warn("💡 Если ошибка, убедитесь, что server.js обновлён");
+      console.error("❌ Ошибка при подтверждении диалога:", err);
     });
 }
 
@@ -64,14 +91,10 @@ const startExchangeBtn = document.getElementById("start-exchange-by-username");
 // === Отображение профиля ===
 if (user && userIdEl) {
   userIdEl.textContent = user.id;
-} else if (userIdEl) {
-  userIdEl.textContent = "—";
 }
 
 if (user && usernameEl) {
   usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
-} else if (usernameEl) {
-  usernameEl.textContent = "не задан";
 }
 
 if (user && avatarEl) {
@@ -102,67 +125,59 @@ document.querySelectorAll(".tab-btn").forEach(button => {
 
     const tabId = button.id.replace("tab-", "");
     const tab = document.getElementById(tabId);
-    if (tab) {
-      tab.classList.add("active");
-    }
+    if (tab) tab.classList.add("active");
   });
 });
 
-// === Загрузка баланса звёзд ===
+// === Загрузка баланса ===
 async function loadStars() {
   if (!starsCount || !user) return;
 
   try {
-    const url = `https://bupsiserver.onrender.com/api/stars/${user.id}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
+    const res = await fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`);
+    if (!res.ok) throw new Error("Сервер не ответил");
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
   } catch (err) {
-    console.error("❌ Ошибка загрузки баланса:", err);
+    console.error("❌ Ошибка загрузки баланса", err);
     starsCount.textContent = "—";
   }
 }
 loadStars();
 
-// === Кнопка "Начать обмен по username" ===
-if (startExchangeBtn) {
-  if (user) {
-    startExchangeBtn.disabled = false;
-    startExchangeBtn.style.opacity = "1";
-    startExchangeBtn.addEventListener("click", async () => {
-      const targetUsername = prompt("Введите username пользователя:", "").trim();
-      if (!targetUsername) {
-        tg?.showAlert?.("Введите username");
-        return;
-      }
+// === Кнопка обмена ===
+if (startExchangeBtn && user) {
+  startExchangeBtn.disabled = false;
+  startExchangeBtn.style.opacity = "1";
 
-      try {
-        const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fromId: user.id,
-            fromUsername: user.username || `user${user.id}`,
-            targetUsername
-          })
-        });
+  startExchangeBtn.addEventListener("click", async () => {
+    const targetUsername = prompt("Введите username пользователя:", "").trim();
+    if (!targetUsername) return tg?.showAlert?.("Введите username");
 
-        const result = await res.json();
-        tg?.showAlert?.(result.success 
-          ? `✅ Запрос отправлен @${targetUsername}` 
-          : `❌ Ошибка: ${result.error}`
-        );
-      } catch (err) {
-        console.error("❌ Ошибка сети:", err);
-        tg?.showAlert?.("Ошибка сети. Проверьте подключение.");
-      }
-    });
-  } else {
-    startExchangeBtn.disabled = true;
-    startExchangeBtn.style.opacity = "0.5";
-    startExchangeBtn.textContent = "Обмен: недоступен";
-  }
+    try {
+      const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromId: user.id,
+          fromUsername: user.username || `user${user.id}`,
+          targetUsername
+        })
+      });
+
+      const result = await res.json();
+      tg?.showAlert?.(result.success 
+        ? `✅ Запрос отправлен @${targetUsername}` 
+        : `❌ Ошибка: ${result.error}`
+      );
+    } catch (err) {
+      tg?.showAlert?.("❌ Ошибка сети. Проверьте подключение.");
+    }
+  });
+} else if (startExchangeBtn) {
+  startExchangeBtn.disabled = true;
+  startExchangeBtn.style.opacity = "0.5";
+  startExchangeBtn.textContent = "Обмен: недоступен";
 }
 
 // === Вторичные вкладки (в профиле) ===
