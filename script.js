@@ -4,9 +4,9 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
-  tg.MainButton.setText("Открыть профиль");
+  console.log('✅ Telegram WebApp: готов');
 } else {
-  console.warn("⚠️ Telegram WebApp SDK не загружен. Добавьте <script src='https://telegram.org/js/telegram-web-app.js'></script>");
+  console.warn('❌ Telegram WebApp не доступен. Добавьте <script src="https://telegram.org/js/telegram-web-app.js"></script>');
 }
 
 // === Применение темы ===
@@ -22,32 +22,43 @@ function applyTheme() {
 }
 applyTheme();
 
-// === Получение пользователя ===
+// === Получение пользователя из Telegram ===
 let user = null;
 
 try {
   if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
     user = tg.initDataUnsafe.user;
-    console.log("✅ Пользователь получен:", user);
+    console.log('✅ Пользователь получен:', user);
   } else {
-    console.warn("❌ initData не содержит user. Откройте через кнопку бота.");
+    console.warn('❌ initData не содержит user. Откройте Mini App через кнопку в боте.');
   }
 } catch (err) {
-  console.error("❌ Ошибка при получении пользователя:", err);
+  console.error('❌ Ошибка при получении пользователя:', err);
 }
 
-// === Элементы DOM ===
+// === DOM-элементы ===
 const starsCount = document.getElementById("stars-count");
 const userIdEl = document.getElementById("user-id");
 const usernameEl = document.getElementById("user-username");
 const avatarEl = document.getElementById("user-avatar");
 const startExchangeBtn = document.getElementById("start-exchange-by-username");
 
-// === Отображение пользователя ===
-if (user && userIdEl && usernameEl && avatarEl) {
+// === Отображение профиля ===
+if (user && userIdEl) {
   userIdEl.textContent = user.id;
-  usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
+  console.log('🆔 ID отображён:', user.id);
+} else if (userIdEl) {
+  userIdEl.textContent = "—";
+}
 
+if (user && usernameEl) {
+  usernameEl.textContent = user.username ? `@${user.username}` : "не задан";
+  console.log('👤 Username:', user.username || "не задан");
+} else if (usernameEl) {
+  usernameEl.textContent = "не задан";
+}
+
+if (user && avatarEl) {
   const photoUrl = user.photo_url 
     ? `${user.photo_url}&s=150` 
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || 'User')}&background=random&size=100`;
@@ -55,12 +66,11 @@ if (user && userIdEl && usernameEl && avatarEl) {
   avatarEl.src = photoUrl;
   avatarEl.onerror = () => {
     avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
+    console.warn('🖼️ Аватарка не загрузилась, использована заглушка');
   };
-} else {
-  console.log("❌ Пользователь не доступен — откройте через Telegram");
-  if (userIdEl) userIdEl.textContent = "—";
-  if (usernameEl) usernameEl.textContent = "не задан";
-  if (avatarEl) avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
+  console.log('🖼️ Аватарка:', photoUrl);
+} else if (avatarEl) {
+  avatarEl.src = "https://via.placeholder.com/50/CCCCCC/000?text=👤";
 }
 
 // === Переключение вкладок ===
@@ -78,55 +88,87 @@ document.querySelectorAll(".tab-btn").forEach(button => {
 
     const tabId = button.id.replace("tab-", "");
     const tab = document.getElementById(tabId);
-    if (tab) tab.classList.add("active");
+    if (tab) {
+      tab.classList.add("active");
+      console.log(`📱 Переключено на вкладку: ${tabId}`);
+    }
   });
 });
 
-// === Загрузка баланса ===
+// === Загрузка баланса звёзд ===
 async function loadStars() {
-  if (!starsCount || !user) return;
+  if (!starsCount || !user) {
+    console.warn('⚠️ Не могу загрузить баланс: нет starsCount или user');
+    return;
+  }
 
   try {
-    const res = await fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`);
-    if (!res.ok) throw new Error("Сервер не ответил");
+    const url = `https://bupsiserver.onrender.com/api/stars/${user.id}`;
+    console.log('⬇️ Запрос баланса:', url);
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
+
     const data = await res.json();
     starsCount.textContent = data.stars || 0;
+    console.log('⭐ Баланс загружен:', data.stars);
   } catch (err) {
-    console.error("❌ Ошибка загрузки баланса", err);
+    console.error('❌ Ошибка загрузки баланса:', err);
     starsCount.textContent = "—";
   }
 }
 loadStars();
 
-// === Кнопка обмена ===
-if (startExchangeBtn && user) {
-  startExchangeBtn.disabled = false;
-  startExchangeBtn.style.opacity = "1";
-  startExchangeBtn.addEventListener("click", async () => {
-    const targetUsername = prompt("Введите username пользователя:", "").trim();
-    if (!targetUsername) return tg?.showAlert?.("Введите username");
+// === Кнопка "Начать обмен по username" ===
+if (startExchangeBtn) {
+  if (user) {
+    startExchangeBtn.disabled = false;
+    startExchangeBtn.style.opacity = "1";
+    startExchangeBtn.addEventListener("click", async () => {
+      console.log('🔄 Кнопка "Начать обмен" нажата');
 
-    try {
-      const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromId: user.id,
-          fromUsername: user.username || `user${user.id}`,
-          targetUsername
-        })
-      });
+      const targetUsername = prompt("Введите username пользователя:", "").trim();
+      if (!targetUsername) {
+        tg?.showAlert?.("Введите username");
+        return;
+      }
 
-      const result = await res.json();
-      tg?.showAlert?.(result.success ? `✅ Запрос отправлен @${targetUsername}` : `❌ Ошибка: ${result.error}`);
-    } catch (err) {
-      tg?.showAlert?.("❌ Ошибка сети. Проверьте подключение.");
-    }
-  });
-} else if (startExchangeBtn) {
-  startExchangeBtn.disabled = true;
-  startExchangeBtn.style.opacity = "0.5";
-  startExchangeBtn.textContent = "Обмен: недоступен (откройте через бота)";
+      try {
+        console.log('📤 Отправка запроса на обмен:', { fromId: user.id, targetUsername });
+
+        const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromId: user.id,
+            fromUsername: user.username || `user${user.id}`,
+            targetUsername
+          })
+        });
+
+        const result = await res.json();
+        console.log('📥 Ответ от сервера:', result);
+
+        tg?.showAlert?.(result.success 
+          ? `✅ Запрос отправлен @${targetUsername}` 
+          : `❌ Ошибка: ${result.error}`
+        );
+
+        if (result.success) {
+          console.log(`✅ Приглашение отправлено @${targetUsername}`);
+        }
+      } catch (err) {
+        console.error('❌ Ошибка сети:', err);
+        tg?.showAlert?.("Ошибка сети. Проверьте подключение.");
+      }
+    });
+    console.log('✅ Кнопка обмена: активна');
+  } else {
+    startExchangeBtn.disabled = true;
+    startExchangeBtn.style.opacity = "0.5";
+    startExchangeBtn.textContent = "Обмен: недоступен";
+    console.warn('❌ Кнопка обмена отключена — пользователь не определён');
+  }
 }
 
 // === Вторичные вкладки (в профиле) ===
