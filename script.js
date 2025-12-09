@@ -70,15 +70,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!targetUsername) return tg?.showAlert?.("Введите username");
 
       try {
-        const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fromId: user.id,
-            fromUsername: user.username || `user${user.id}`,
-            targetUsername
-          })
-        });
+const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    fromId: user.id,
+    fromUsername: user.username || `user${user.id}`,
+    targetUsername: targetUsername
+  })
+});
+
 
         const result = await res.json();
         tg?.showAlert?.(
