@@ -99,23 +99,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // === НАЧАТЬ ОБМЕН ПО USERNAME ===
   startExchangeBtn.addEventListener('click', async () => {
-    const username = prompt('Введите username друга (без @):', '');
-    if (!username) return;
+    const usernameInput = prompt('Введите username друга (без @):', '');
+    if (!usernameInput) return;
 
-    exchangeArea.innerHTML = 'Отправляем приглашение...';
+    // Показываем: ждём ответа
+    exchangeArea.innerHTML = `<p>🕐 Ждём ответа от <strong>@${usernameInput}</strong>...</p>`;
 
+    // Отправляем запрос на сервер
     const res = await fetch(`${API_BASE}/api/start-exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fromId: user.id,
-        toUsername: username.trim()
+        toUsername: usernameInput.trim(),
+        fromUsername: user.username || 'друг'
       })
     });
 
     const data = await res.json();
+
     if (data.success) {
-      exchangeArea.innerHTML = '<p>✅ Приглашение отправлено! Дождитесь ответа.</p>';
+      // Уже не меняем — пусть висит "ждём ответа"
+      // (бот сам пришлёт ответ: либо пришлёт "принял", либо "отклонил")
     } else {
       exchangeArea.innerHTML = `<p>❌ Ошибка: ${data.error}</p>`;
     }
@@ -145,7 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (startParam && startParam.startsWith('exchange_')) {
     const partnerId = startParam.replace('exchange_', '');
     exchangeArea.innerHTML = `
-      <h3>🎁 Выберите подарок для обмена</h3>
+      <h3>🎁 Обмен с пользователем</h3>
+      <p>Выберите подарок, который хотите обменять:</p>
       <div id="select-gift-grid" class="gifts-grid"></div>
       <button id="send-gift-exchange" class="btn">Отправить подарок</button>
     `;
