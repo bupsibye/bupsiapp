@@ -10,188 +10,98 @@
       --tg-bg: #fff;
       --tg-text: #000;
       --tg-secondary-bg: #f0f0f0;
-      --tg-border: #ddd;
     }
     body {
       font-family: -apple-system, sans-serif;
       margin: 0;
-      padding: 10px;
+      padding: 20px;
       background: var(--tg-bg);
       color: var(--tg-text);
+      text-align: center;
     }
-    .grid {
-      display: flex;
-      gap: 20px;
+    .icon {
+      font-size: 60px;
       margin: 20px 0;
     }
-    .side {
-      flex: 1;
-      background: var(--tg-secondary-bg);
-      padding: 15px;
-      border-radius: 12px;
-      text-align: center;
+    h2 {
+      margin: 0 0 10px;
     }
-    .gift {
-      padding: 10px;
-      background: white;
-      margin: 8px 0;
-      border-radius: 8px;
+    p {
+      color: #666;
       font-size: 14px;
+      margin: 0 0 20px;
     }
-    button {
-      padding: 12px;
-      width: 100%;
+    .btn {
+      padding: 14px 24px;
       font-size: 16px;
       border: none;
-      border-radius: 10px;
-      background: #0088cc;
+      border-radius: 12px;
+      margin: 0 5px;
+      cursor: pointer;
+    }
+    .btn-accept {
+      background: #00C853;
       color: white;
-      margin-top: 10px;
     }
-    input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid var(--tg-border);
-      border-radius: 10px;
-      margin: 10px 0;
-    }
-    .status {
-      text-align: center;
-      margin: 10px 0;
-      font-size: 14px;
-      color: #888;
+    .btn-decline {
+      background: #f44336;
+      color: white;
     }
   </style>
 </head>
 <body>
-  <h2>🎁 Обмен подарками</h2>
+  <div class="icon">🔄</div>
+  <h2>Подтвердите обмен</h2>
+  <p>Пользователь предложил обменяться подарками</p>
 
-  <div class="grid">
-    <div class="side" id="myGifts">
-      <h3>Ваши подарки</h3>
-    </div>
-    <div class="side" id="partnerGifts">
-      <h3>Подарки партнёра</h3>
-    </div>
+  <div>
+    <button class="btn btn-accept" onclick="acceptExchange()">✅ Принять</button>
+    <button class="btn btn-decline" onclick="declineExchange()">❌ Отклонить</button>
   </div>
 
-  <input type="text" id="giftInput" placeholder="Название подарка" />
-  <button onclick="addGift()">Добавить подарок</button>
-  <button id="confirmBtn" onclick="confirmExchange()">Подтвердить обмен</button>
-
-  <div class="status" id="status">Загрузка...</div>
-
   <script>
-    const tg = window.Telegram.WebApp;
+    const tg = Telegram.WebApp;
     tg.ready();
+    tg.expand();
 
-    const initData = new URLSearchParams(tg.initData);
-    const startParam = initData.get('startapp'); // например: exchange_123456789
-    const myId = tg.initDataUnsafe.user.id;
+    // Получаем ID сессии из startapp
+    const urlParams = new URLSearchParams(tg.initData);
+    const startParam = urlParams.get('startapp'); // exchange_ex_123
+    const sessionId = startParam?.replace('exchange_', '');
 
-    const API_URL = 'https://bupsiserver.onrender.com';
-    const sessionId = startParam;
+    if (!sessionId) {
+      tg.showAlert?.('❌ Ошибка: сессия не найдена');
+      tg.close?.();
+    }
 
-    const myGiftsEl = document.getElementById('myGifts');
-    const partnerGiftsEl = document.getElementById('partnerGifts');
-    const statusEl = document.getElementById('status');
-    const confirmBtn = document.getElementById('confirmBtn');
-
-    // Поддельные подарки (в реальности можно хранить в localStorage)
-    const gifts = new Map([
-      [1, { id: 1, name: 'Плюшевый кот' }],
-      [2, { id: 2, name: 'Золотая звезда' }]
-    ]);
-    let lastGiftId = 2;
-
-    // Загрузка сессии
-    async function loadSession() {
+    // Кнопка: принять обмен
+    async function acceptExchange() {
       try {
-        const res = await fetch(`${API_URL}/api/session/${sessionId}`);
-        const session = await res.json();
-        if (session.error) return;
-
-        const isMyTurn = session.fromId === myId;
-        const myGiftId = isMyTurn ? session.fromGiftId : session.toGiftId;
-        const partnerGiftId = isMyTurn ? session.toGiftId : session.fromGiftId;
-
-        updateGifts(myGiftId, partnerGiftId);
-        updateStatus(session);
-      } catch (err) {
-        console.error('Ошибка загрузки сессии:', err);
-      }
-    }
-
-    function updateGifts(myGiftId, partnerGiftId) {
-      myGiftsEl.innerHTML = '<h3>Ваши подарки</h3>';
-      partnerGiftsEl.innerHTML = '<h3>Подарки партнёра</h3>';
-
-      if (myGiftId) {
-        const gift = gifts.get(myGiftId) || { name: 'Подарок' };
-        const div = document.createElement('div');
-        div.className = 'gift';
-        div.textContent = gift.name;
-        myGiftsEl.appendChild(div);
-      }
-
-      if (partnerGiftId) {
-        const div = document.createElement('div');
-        div.className = 'gift';
-        div.textContent = '🎁 Подарок';
-        partnerGiftsEl.appendChild(div);
-      }
-    }
-
-    function updateStatus(session) {
-      if (session.status === 'completed') {
-        statusEl.textContent = '✅ Обмен завершён!';
-        confirmBtn.disabled = true;
-      } else if (session.fromConfirmed && session.toConfirmed) {
-        statusEl.textContent = 'Подтверждаем...';
-      } else if (session.fromConfirmed || session.toConfirmed) {
-        statusEl.textContent = 'Ожидание подтверждения';
-      } else {
-        statusEl.textContent = 'Выберите подарок';
-      }
-    }
-
-    async function addGift() {
-      const name = document.getElementById('giftInput').value;
-      if (!name) return;
-
-      lastGiftId++;
-      gifts.set(lastGiftId, { id: lastGiftId, name });
-
-      try {
-        await fetch(`${API_URL}/api/exchange/select-gift`, {
+        const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${sessionId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, userId: myId, giftId: lastGiftId })
+          body: JSON.stringify({ userId: tg.initDataUnsafe.user.id })
         });
-        document.getElementById('giftInput').value = '';
-        loadSession();
+
+        const result = await res.json();
+
+        if (result.success) {
+          tg.showAlert?.(`✅ Обмен принят! Получено ${result.stars} ⭐`);
+        } else {
+          tg.showAlert?.(`❌ Ошибка: ${result.error}`);
+        }
       } catch (err) {
-        console.error('Ошибка добавления подарка:', err);
+        tg.showAlert?.('❌ Ошибка соединения с сервером');
+      } finally {
+        tg.close?.();
       }
     }
 
-    async function confirmExchange() {
-      try {
-        await fetch(`${API_URL}/api/confirm-exchange`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, userId: myId })
-        });
-        statusEl.textContent = 'Вы подтвердили';
-        confirmBtn.disabled = true;
-      } catch (err) {
-        console.error('Ошибка подтверждения:', err);
-      }
+    // Кнопка: отклонить — просто закрываем
+    function declineExchange() {
+      tg.showAlert?.('Вы отклонили обмен');
+      tg.close?.();
     }
-
-    // Обновляем сессию каждые 3 секунды
-    setInterval(loadSession, 3000);
-    loadSession();
   </script>
 </body>
 </html>
