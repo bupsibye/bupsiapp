@@ -1,259 +1,287 @@
-// === Логи для отладки ===
-console.log("🚀 Mini App: запуск");
+const tg = window.Telegram.WebApp;
+tg.ready();
 
-// Инициализация Telegram WebApp
-const tg = window.Telegram?.WebApp;
+// === ЭЛЕМЕНТЫ ===
+const tabs = document.querySelectorAll(".tab");
+const mainContents = document.querySelectorAll(".main-content > .tab-content");
+const userTab = document.getElementById("user-tab");
+const inventory = document.getElementById("inventory");
+const userAvatar = document.getElementById("user-avatar");
+const buyStarsBtn = document.getElementById("buy-stars-btn");
+const generateLinkBtn = document.getElementById("generate-exchange-link");
+const exchangeLinkOutput = document.getElementById("exchange-link-output");
+const userGiftsGrid = document.getElementById("user-gifts-grid");
+const exchangeGiftsGrid = document.getElementById("exchange-gifts-grid");
+const withdrawGiftBtn = document.getElementById("withdraw-gift-btn");
+const starsCount = document.getElementById("stars-count");
 
-if (tg) {
-  tg.ready();
-  tg.expand();
-  console.log("✅ Telegram WebApp: готов");
-} else {
-  console.error("❌ Telegram WebApp: не загружен");
-  alert("Ошибка: откройте Mini App через @bupsibot");
+let user = null;
+let myGifts = JSON.parse(localStorage.getItem("myGifts") || "[]");
+let stars = parseInt(localStorage.getItem("stars") || "100");
+
+// === БАЗОВЫЙ URL БЭКА ===
+const API_BASE = 'https://bupsiserver.onrender.com'; // ← ВАЖНО: Render
+
+// === ПРИМЕНЕНИЕ ТЕМЫ ===
+function applyTheme() {
+  const theme = tg.themeParams;
+  const dark = tg.colorScheme === 'dark';
+  document.documentElement.style.setProperty('--tg-bg', theme.bg_color || (dark ? '#1a1a1a' : '#fff'));
+  document.documentElement.style.setProperty('--tg-text', theme.text_color || (dark ? '#fff' : '#000'));
+  document.documentElement.style.setProperty('--tg-hint', theme.hint_color || (dark ? '#999' : '#888'));
+  document.documentElement.style.setProperty('--tg-accent', theme.accent_text_color || '#0088cc');
+  document.documentElement.style.setProperty('--tg-secondary-bg', dark ? '#2c2c2c' : '#f0f0f0');
+  document.documentElement.style.setProperty('--tg-border', dark ? '#444' : '#ddd');
 }
 
-// Пользователь из Telegram
-const user = tg?.initDataUnsafe?.user || null;
-console.log("👤 Пользователь:", user);
+// === ИНИЦИАЛИЗАЦИЯ ===
+async function init() {
+  applyTheme();
 
-// Функция: обновить баланс ⭐
-function updateStars() {
-  if (!user) return;
-
-  fetch(`https://bupsiserver.onrender.com/api/stars/${user.id}`)
-    .then(res => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    })
-    .then(data => {
-      const el = document.getElementById("stars-count");
-      if (el) el.textContent = data.stars || 0;
-    })
-    .catch(err => {
-      console.error("❌ Ошибка загрузки баланса:", err);
-      const el = document.getElementById("stars-count");
-      if (el) el.textContent = "—";
-    });
-}
-
-// При загрузке DOM
-document.addEventListener('DOMContentLoaded', () => {
-  console.log("DOMContentLoaded: старт");
-
-  // === Обновить баланс при старте ===
-  updateStars();
-
-  // === Проверка: пришли по startapp (принять обмен) ===
-  const initData = tg?.initData || '';
-  const urlParams = new URLSearchParams(initData);
-  const startParam = urlParams.get('start_param');
-
-  if (startParam?.startsWith('exchange_')) {
-    const sessionId = startParam.replace('exchange_', '');
-    tg.showConfirm('Принять обмен?', async (ok) => {
-      if (ok) {
-        try {
-          const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${sessionId}`);
-          const result = await res.json();
-
-          if (result.success) {
-            tg.showAlert(`✅ Обмен принят! Получено ${result.stars} ⭐`);
-            updateStars(); // Обновим баланс
-          } else {
-            tg.showAlert(`❌ Ошибка: ${result.error}`);
-          }
-        } catch (err) {
-          tg.showAlert('❌ Не удалось подключиться к серверу');
-          console.error("Ошибка принятия обмена:", err);
-        }
-      }
-      tg.close(); // Закрываем Mini App
-    });
+  user = tg.initDataUnsafe.user;
+  if (user && user.photo_url) {
+    userAvatar.src = user.photo_url;
   }
 
-  // === Проверка: открыли с exchange_id (внутри Mini App) ===
-  const urlSearch = new URLSearchParams(window.location.search);
-  const exchangeId = urlSearch.get('exchange_id');
-  const mainContent = document.querySelector('.main-content');
+  starsCount.textContent = stars;
+  renderGiftGrids();
 
-  if (exchangeId && mainContent) {
-    mainContent.innerHTML = `
-      <div style="padding: 20px; text-align: center;">
-        <div style="width: 60px; height: 60px; border-radius: 50%; background: #0088cc; margin: 0 auto 16px; color: white; font-size: 28px; display: flex; align-items: center; justify-content: center;">
-          🔄
-        </div>
-        <h2>Обмен</h2>
-        <p style="color: var(--tg-hint); font-size: 14px;">Ожидание подтверждения</p>
-        <div style="background: var(--tg-secondary-bg); border-radius: 12px; padding: 16px; margin: 20px 0;">
-          <p><strong>От:</strong> <span id="exchange-from">@user1</span></p>
-          <p><strong>Сумма:</strong> <span id="exchange-stars">50 ⭐</span></p>
-        </div>
-        <div style="margin-top: 20px;">
-          <button id="accept-exchange" style="padding: 12px 24px; font-size: 16px; background: #00C853; color: white; border: none; border-radius: 8px;">✅ Принять</button>
-          <button id="decline-exchange" style="padding: 12px 24px; font-size: 16px; background: #f44336; color: white; border: none; border-radius: 8px; margin-left: 10px;">❌ Отклонить</button>
-        </div>
-      </div>
-    `;
-
-    const acceptBtn = document.getElementById('accept-exchange');
-    const declineBtn = document.getElementById('decline-exchange');
-
-    if (acceptBtn) {
-      acceptBtn.onclick = async () => {
-        try {
-          const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${exchangeId}`);
-          const result = await res.json();
-
-          if (result.success) {
-            tg.showAlert(`✅ Вы приняли обмен! Получено ${result.stars} ⭐`);
-            updateStars(); // Обновим баланс
-          } else {
-            tg.showAlert(`❌ Ошибка: ${result.error}`);
-          }
-        } catch (err) {
-          tg.showAlert('❌ Ошибка соединения с сервером');
-          console.error("Ошибка принятия обмена:", err);
-        }
-        window.history.back();
-      };
+  // === ПРОВЕРКА start_param — если Mini App запущен через ссылку ===
+  const startParam = tg.initDataUnsafe.start_param;
+  if (startParam) {
+    if (startParam.startsWith('exchange_')) {
+      // Это приглашение от друга
+      const partnerId = startParam.replace('exchange_', '');
+      showExchangeRequest(partnerId);
+    } else {
+      // Это sessionId обмена
+      showExchangeSession(startParam);
     }
-
-    if (declineBtn) {
-      declineBtn.onclick = () => {
-        tg.showAlert('Вы отклонили обмен');
-        window.history.back();
-      };
-    }
-
-    tg.BackButton.show();
-    tg.BackButton.onClick(() => {
-      window.history.back();
-    });
-
-    // При возврате — убираем кнопку
-    window.addEventListener('popstate', () => {
-      tg.BackButton.hide();
-    });
-
     return;
   }
 
-  // === Переключение вкладок ===
-  document.querySelectorAll(".tab-btn").forEach(button => {
-    button.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-      button.classList.add("active");
+  setupEventListeners();
+}
 
-      if (button.id === "buy-stars-top") {
-        window.open('https://spend.tg/?r=UQBeGWwQx--zQoeefoEevKIma_qmLKK-SeEd3VV-1YV72KgF', '_blank');
-        return;
-      }
+// === ПОКАЗ ЗАПРОСА ОБМЕНА (вы получили предложение) ===
+async function showExchangeRequest(partnerId) {
+  document.querySelector('.main-content').innerHTML = `
+    <div class="exchange-request">
+      <h2>🤝 Обмен с другом</h2>
+      <p>Пользователь хочет обменяться подарками с вами!</p>
+      <div id="partner-gifts-grid" class="gifts-grid"></div>
+      <button id="accept-exchange-btn" class="btn">Начать обмен</button>
+    </div>
+  `;
 
-      const tabId = button.id.replace("tab-", "");
-      const tab = document.getElementById(tabId);
-      if (tab) tab.classList.add("active");
+  renderUserGifts('partner-gifts-grid');
+
+  document.getElementById('accept-exchange-btn').onclick = async () => {
+    const selected = document.querySelector('.gift-item.selected');
+    if (!selected) {
+      tg.showAlert('Выберите подарок для обмена!');
+      return;
+    }
+    const giftId = selected.dataset.giftId;
+
+    const res = await fetch(`${API_BASE}/api/start-exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fromId: user.id,
+        toId: partnerId,
+        myGiftId: giftId
+      })
     });
-  });
 
-  // === Кнопка "Начать обмен" ===
-  const startExchangeBtn = document.getElementById("start-exchange-by-username");
-  if (startExchangeBtn && user) {
-    startExchangeBtn.addEventListener("click", async () => {
-      const targetUsername = prompt("Введите username пользователя:", "").trim();
-      if (!targetUsername) {
-        return tg?.showAlert?.("Введите username");
-      }
+    const data = await res.json();
+    if (data.success) {
+      tg.showAlert('Запрос отправлен! Дождитесь подтверждения.');
+      tg.close();
+    } else {
+      tg.showAlert('Ошибка: ' + (data.error || 'Не удалось отправить запрос'));
+    }
+  };
+}
 
-      try {
-        console.log("📤 Отправка запроса на обмен:", { fromId: user.id, targetUsername });
-        const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fromId: user.id,
-            fromUsername: user.username || `user${user.id}`,
-            targetUsername
-          })
-        });
+// === ПОКАЗ СЕССИИ ОБМЕНА (выбираем свой подарок) ===
+async function showExchangeSession(sessionId) {
+  document.querySelector('.main-content').innerHTML = `
+    <div class="exchange-session">
+      <h2>🎁 Выберите свой подарок</h2>
+      <div id="session-gifts-grid" class="gifts-grid"></div>
+      <button id="submit-exchange-gift" class="btn">Отправить</button>
+    </div>
+  `;
 
-        console.log("📡 Статус ответа:", res.status);
-        if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
+  renderUserGifts('session-gifts-grid', 'select');
 
-        const result = await res.json();
-        console.log("📦 Результат:", result);
+  document.getElementById('submit-exchange-gift').onclick = async () => {
+    const selected = document.querySelector('.gift-item.selected');
+    if (!selected) {
+      tg.showAlert('Сначала выберите подарок!');
+      return;
+    }
+    const giftId = selected.dataset.giftId;
 
-        tg?.showAlert?.(result.success 
-          ? `✅ Запрос отправлен @${targetUsername}` 
-          : `❌ Ошибка: ${result.error}`
-        );
-      } catch (err) {
-        console.error("💥 Ошибка fetch:", err);
-        tg?.showAlert?.("❌ Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.");
-      }
+    const res = await fetch(`${API_BASE}/api/exchange/select-gift`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, userId: user.id, giftId })
     });
-  }
 
-  // Первый раз — обновить баланс
-  updateStars();
+    const data = await res.json();
+    if (data.success) {
+      tg.showAlert('Подарок выбран! Ожидайте подтверждения…');
+      waitForExchangeConfirmation(sessionId);
+    } else {
+      tg.showAlert('Ошибка: ' + data.error);
+    }
+  };
+}
 
-  // === Загрузка истории ===
-  async function loadHistory() {
-    const list = document.getElementById('history-list');
-    if (!list || !user) return;
-    list.innerHTML = '<p>Загрузка...</p>';
-
+// === ОЖИДАНИЕ ПОДТВЕРЖДЕНИЯ ОТ ПАРТНЁРА ===
+async function waitForExchangeConfirmation(sessionId) {
+  const poll = async () => {
     try {
-      const res = await fetch(`https://bupsiserver.onrender.com/api/history/${user.id}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(`${API_BASE}/api/session/${sessionId}`);
+      const session = await res.json();
+      if (session.error) return;
 
-      const history = await res.json();
-
-      if (!history.length) {
-        list.innerHTML = '<p>Нет операций</p>';
+      if (session.partnerGiftId && session.fromConfirmed && session.toConfirmed) {
+        tg.showAlert('🎉 Обмен завершён! Подарки переданы.');
+        tg.close();
         return;
       }
 
-      list.innerHTML = history.map(item => `
-        <div class="history-item type-${item.type}">
-          ${item.description}
-          <div class="date">${new Date(item.date).toLocaleString('ru')}</div>
-        </div>
-      `).join('');
+      // Оповещение, если отклонили
+      if (session.status === 'declined') {
+        tg.showAlert('❌ Обмен отклонён.');
+        tg.close();
+        return;
+      }
+
+      setTimeout(poll, 2000);
     } catch (err) {
-      console.error("❌ Ошибка загрузки истории:", err);
-      list.innerHTML = '<p>Ошибка загрузки</p>';
+      setTimeout(poll, 3000);
     }
+  };
+  poll();
+}
+
+// === ОТРИСОВКА СЕТИ ПОДАРКОВ (с выбором) ===
+function renderUserGifts(gridId, mode = 'normal') {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  if (myGifts.length === 0) {
+    grid.innerHTML = '<div class="gift-item empty"><span>Нет подарков</span></div>';
+    return;
   }
 
-  const historyTabBtn = document.querySelector('[data-tab="history"]');
-  if (historyTabBtn) {
-    historyTabBtn.addEventListener('click', loadHistory);
-  }
+  myGifts.forEach(gift => {
+    const item = document.createElement('div');
+    item.className = 'gift-item';
+    item.dataset.giftId = gift.id;
+    item.innerHTML = `
+      <img src="https://via.placeholder.com/60/CCCCCC/999999?text=🎁" alt="Gift">
+      <span>${gift.name.length > 6 ? gift.name.slice(0, 6) + "..." : gift.name}</span>
+    `;
 
-  // === Вторичные вкладки (в профиле) ===
-  document.querySelectorAll(".tabs-secondary button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tabs-secondary button").forEach(b => b.classList.remove("tab-active"));
-      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-      btn.classList.add("tab-active");
-      const pane = document.getElementById(btn.getAttribute("data-tab"));
-      if (pane) pane.classList.add("active");
+    item.onclick = () => {
+      document.querySelectorAll(`#${gridId} .gift-item`).forEach(i => i.classList.remove('selected'));
+      item.classList.add('selected');
+    };
+
+    grid.appendChild(item);
+  });
+}
+
+// === ОТРИСОВКА ИНВЕНТАРЯ (без выбора) ===
+function renderGiftGrids() {
+  [userGiftsGrid, exchangeGiftsGrid].forEach(grid => {
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    if (myGifts.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "gift-item empty";
+      grid.appendChild(empty);
+    } else {
+      myGifts.forEach(gift => {
+        const item = document.createElement("div");
+        item.className = "gift-item";
+        item.innerHTML = `
+          <img src="https://via.placeholder.com/60/CCCCCC/999999?text=🎁" alt="Gift">
+          <span>${gift.name.length > 6 ? gift.name.slice(0, 6) + "..." : gift.name}</span>
+        `;
+        grid.appendChild(item);
+      });
+    }
+  });
+}
+
+// === СЛУШАТЕЛИ ===
+function setupEventListeners() {
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      const tabId = tab.getAttribute("data-tab");
+
+      if (tabId === "stars") {
+        tg.openLink("https://spend.tg/telegram-stars", { try_instant_view: false });
+        return;
+      }
+
+      tabs.forEach(t => t.classList.remove("active"));
+      mainContents.forEach(c => c.classList.remove("active"));
+
+      tab.classList.add("active");
+      document.getElementById(tabId)?.classList.add("active");
     });
   });
 
-  // === Показываем данные пользователя ===
-  if (user) {
-    const userIdEl = document.getElementById('user-id');
-    const usernameEl = document.getElementById('user-username');
-    const avatarEl = document.getElementById('user-avatar');
-
-    if (userIdEl) userIdEl.textContent = user.id;
-    if (usernameEl) usernameEl.textContent = user.username || 'не указан';
-    if (avatarEl && user.photo_url) {
-      avatarEl.src = user.photo_url;
+  userTab.addEventListener("click", () => {
+    inventory.classList.toggle("active");
+    if (inventory.classList.contains("active")) {
+      renderGiftGrids();
     }
-  }
-});
+  });
 
+  generateLinkBtn.addEventListener("click", () => {
+    const link = `https://t.me/GiftSwapBot?startapp=exchange_${user?.id}`;
+    exchangeLinkOutput.innerHTML = `
+      <p>Отправьте ссылку другу:</p>
+      <a href="${link}" target="_blank">${link.slice(-10)}...</a>
+    `;
+  });
+
+  withdrawGiftBtn.addEventListener("click", async () => {
+    if (myGifts.length === 0) {
+      tg.showAlert("Нет подарков для вывода");
+      return;
+    }
+
+    if (stars < 25) {
+      tg.showAlert("⚠️ Недостаточно звёзд: нужно 25");
+      return;
+    }
+
+    tg.showConfirm("Оплатить 25 ⭐ за вывод подарка?", async (ok) => {
+      if (ok) {
+        stars -= 25;
+        localStorage.setItem("stars", stars);
+        starsCount.textContent = stars;
+
+        const gift = myGifts.pop();
+        localStorage.setItem("myGifts", JSON.stringify(myGifts));
+
+        renderGiftGrids();
+        tg.showAlert(`🎁 "${gift.name}" отправлен в ваш чат с ботом!`);
+      }
+    });
+  });
+}
+
+// === ЗАПУСК ===
+init();
