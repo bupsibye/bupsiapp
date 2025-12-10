@@ -70,15 +70,43 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("✅ Кнопка 'Купить ⭐' активирована");
   }
 
-  // === Кнопка "Начать обмен" ===
+  // === Кнопка "Начать обмен" (через username) ===
   const startExchangeBtn = document.getElementById('start-exchange-by-username');
   if (startExchangeBtn) {
-    startExchangeBtn.addEventListener('click', () => {
-      const target = prompt("Введите username получателя:", "").trim().replace('@', '');
-      if (!target) return tg.showAlert?.("Введите username");
+    startExchangeBtn.addEventListener('click', async () => {
+      const raw = prompt("Введите username получателя:", "");
+      const target = raw ? raw.trim().replace('@', '') : "";
 
-      tg.showAlert?.(`✅ Запрос отправлен @${target}`);
-      console.log("📤 Обмен запрошен:", target);
+      if (!target) {
+        return tg.showAlert?.("Введите корректный username");
+      }
+
+      console.log("📤 Запрос обмена с пользователем:", target);
+
+      try {
+        const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromId: user.id,
+            fromUsername: user.username,
+            targetUsername: target
+          })
+        });
+
+        const data = await res.json();
+        console.log("📥 Ответ от /api/start-exchange-by-username:", data);
+
+        if (!data.success) {
+          tg.showAlert?.(`❌ ${data.error || 'Не удалось отправить запрос'}`);
+          return;
+        }
+
+        tg.showAlert?.(`✅ Запрос на обмен отправлен @${target}`);
+      } catch (e) {
+        console.error("❌ Ошибка запроса обмена:", e);
+        tg.showAlert?.("❌ Ошибка соединения с сервером");
+      }
     });
     console.log("✅ Кнопка 'Начать обмен' активирована");
   } else {
