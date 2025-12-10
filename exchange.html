@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Обмен подарками</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --tg-bg: #fff;
+      --tg-text: #000;
+      --tg-secondary-bg: #f0f0f0;
+      --tg-border: #ddd;
+    }
+    body {
+      font-family: -apple-system, sans-serif;
+      margin: 0;
+      padding: 10px;
+      background: var(--tg-bg);
+      color: var(--tg-text);
+    }
+    .grid {
+      display: flex;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .side {
+      flex: 1;
+      background: var(--tg-secondary-bg);
+      padding: 15px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .gift {
+      padding: 10px;
+      background: white;
+      margin: 8px 0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    button {
+      padding: 12px;
+      width: 100%;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background: #0088cc;
+      color: white;
+      margin-top: 10px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--tg-border);
+      border-radius: 10px;
+      margin: 10px 0;
+    }
+    .status {
+      text-align: center;
+      margin: 10px 0;
+      font-size: 14px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎁 Обмен подарками</h2>
+
+  <div class="grid">
+    <div class="side" id="myGifts">
+      <h3>Ваши подарки</h3>
+    </div>
+    <div class="side" id="partnerGifts">
+      <h3>Подарки партнёра</h3>
+    </div>
+  </div>
+
+  <input type="text" id="giftInput" placeholder="Название подарка" />
+  <button onclick="addGift()">Добавить подарок</button>
+  <button id="confirmBtn" onclick="confirmExchange()">Подтвердить обмен</button>
+
+  <div class="status" id="status">Загрузка...</div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+
+    const initData = new URLSearchParams(tg.initData);
+    const startParam = initData.get('startapp');
+    const myId = tg.initDataUnsafe.user.id;
+
+    const sessionId = startParam;
+    const API_URL = 'https://bupsiserver.onrender.com';
+
+    const myGiftsEl = document.getElementById('myGifts');
+    const partnerGiftsEl = document.getElementById('partnerGifts');
+    const statusEl = document.getElementById('status');
+    const confirmBtn = document.getElementById('confirmBtn');
+
+    async function loadSession() {
+      const res = await fetch(`${API_URL}/api/session/${sessionId}`);
+      const session = await res.json();
+      if (session.error) return;
+
+      const isFrom = session.fromId === myId;
+      const myGifts = isFrom ? session.fromGiftId : session.toGiftId;
+      const partnerGifts = isFrom ? session.toGiftId : session.fromGiftId;
+
+      updateGifts(myGifts, partnerGifts);
+      updateStatus(session);
+    }
+
+    function updateGifts(myGiftId, partnerGiftId) {
+      myGiftsEl.innerHTML = '<h3>Ваши подарки</h3>';
+      partnerGiftsEl.innerHTML = '<h3>Подарки партнёра</h3>';
+
+      const myGift = [...window.gifts.values()].find(g => g.id == myGiftId);
+      if (myGift) {
+        const div = document.createElement('div');
+        div.className = 'gift';
+        div.textContent = myGift.name;
+        myGiftsEl.appendChild(div);
+      }
+
+      if (partnerGiftId) {
+        const div = document.createElement('div');
+        div.className = 'gift';
+        div.textContent = '🎁 Подарок';
+        partnerGiftsEl.appendChild(div);
+      }
+    }
+
+    function updateStatus(session) {
+      if (session.status === 'completed') {
+        statusEl.textContent = '✅ Обмен завершён!';
+        confirmBtn.disabled = true;
+      } else if (session.fromConfirmed && session.toConfirmed) {
+        statusEl.textContent = 'Подтверждаем...';
+      } else {
+        statusEl.textContent = session.fromConfirmed || session.toConfirmed ? 'Ожидание подтверждения' : 'Выберите подарок';
+      }
+    }
+
+    async function addGift() {
+      const name = document.getElementById('giftInput').value;
+      if (!name) return;
+
+      await fetch(`${API_URL}/api/add-gift`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: myId, name })
+      });
+
+      // Привязываем подарок к сессии
+      const res = await fetch(`${API_URL}/api/exchange/select-gift`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, userId: myId, giftId: window.lastGiftId || 1 })
+      });
+
+      document.getElementById('giftInput').value = '';
+      loadSession();
+    }
+
+    async function confirmExchange() {
+      await fetch(`${API_URL}/api/confirm-exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, userId: myId })
+      });
+      statusEl.textContent = 'Вы подтвердили';
+      confirmBtn.disabled = true;
+    }
+
+    setInterval(loadSession, 3000);
+    loadSession();
+  </script>
+</body>
+</html>
