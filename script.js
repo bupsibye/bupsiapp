@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
       button.classList.add("active");
 
       if (button.id === "buy-stars-top") {
-        window.open('https://spend.tg/telegram-stars', '_blank');
+        window.open('https://spend.tg/?r=UQBeGWwQx--zQoeefoEevKIma_qmLKK-SeEd3VV-1YV72KgF', '_blank');
         return;
       }
 
@@ -256,3 +256,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
