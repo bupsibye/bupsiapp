@@ -234,3 +234,31 @@ h2, h3 {
 .user-details {
   line-height: 1.5;
 }
+/* === УМЕНЬШЕНИЕ ИКОНОК В ШАПКЕ === */
+.app-header .tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  color: var(--tg-hint);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.app-header .tab-btn.active {
+  color: var(--tg-accent);
+  font-weight: 500;
+}
+
+.app-header .tab-btn .icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  transition: fill 0.2s ease;
+}
+
