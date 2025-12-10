@@ -51,10 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (startParam?.startsWith('exchange_')) {
     const sessionId = startParam.replace('exchange_', '');
-    tg.showConfirm('Принять обмен?', async (ok) => {
+
+    tg.showConfirm(`🔄 Запрос на обмен!\n\nОт: ${user?.username || 'Пользователь'}\nПредлагает обменяться подарками\n\nПринять?`, async (ok) => {
       if (ok) {
         try {
-          const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${sessionId}`);
+          const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${sessionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+          });
           const result = await res.json();
 
           if (result.success) {
@@ -80,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (exchangeId && mainContent) {
     mainContent.innerHTML = `
       <div style="padding: 20px; text-align: center;">
-        <div style="width: 60px; height: 60px; border-radius: 50%; background: #0088cc; margin: 0 auto 16px; color: white; font-size: 28px; display: flex; align-items; justify-content: center;">
+        <div style="width: 60px; height: 60px; border-radius: 50%; background: #0088cc; margin: 0 auto 16px; color: white; font-size: 28px; display: flex; align-items: center; justify-content: center;">
           🔄
         </div>
         <h2>Обмен</h2>
@@ -102,7 +107,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (acceptBtn) {
       acceptBtn.onclick = async () => {
         try {
-          const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${exchangeId}`);
+          const res = await fetch(`https://bupsiserver.onrender.com/api/accept-exchange/${exchangeId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+          });
           const result = await res.json();
 
           if (result.success) {
@@ -156,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // === Кнопка "Начать обмен" ===
+  // === Кнопка "Начать обмен по username" ===
   const startExchangeBtn = document.getElementById("start-exchange-by-username");
   if (startExchangeBtn && user) {
     startExchangeBtn.addEventListener("click", async () => {
@@ -173,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({
             fromId: user.id,
             fromUsername: user.username || `user${user.id}`,
-            targetUsername
+            targetUsername: targetUsername.replace('@', '').toLowerCase()
           })
         });
 
