@@ -1,4 +1,4 @@
-// Ждём полной загрузки DOM
+// Ждём загрузки DOM
 document.addEventListener('DOMContentLoaded', () => {
   const tg = window.Telegram?.WebApp;
   if (!tg) {
@@ -7,43 +7,42 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   tg.ready();
 
-  // === ЭЛЕМЕНТЫ (должны быть в index.html с этими id!) ===
-  const tabs = document.querySelectorAll(".tab");
-  const mainContents = document.querySelectorAll(".main-content > .tab-content");
-  const userTab = document.getElementById("user-tab");
-  const inventory = document.getElementById("inventory");
-  const userAvatar = document.getElementById("user-avatar");
-  const buyStarsBtn = document.getElementById("buy-stars-btn");
-  const generateLinkBtn = document.getElementById("generate-exchange-link");
-  const exchangeLinkOutput = document.getElementById("exchange-link-output");
-  const userGiftsGrid = document.getElementById("user-gifts-grid");
-  const exchangeGiftsGrid = document.getElementById("exchange-gifts-grid");
-  const withdrawGiftBtn = document.getElementById("withdraw-gift-btn");
-  const starsCount = document.getElementById("stars-count");
+  // === ЭЛЕМЕНТЫ — теперь ПРАВИЛЬНЫЕ ID и классы ===
+  const tabShop = document.getElementById('tab-shop');
+  const tabExchange = document.getElementById('tab-exchange');
+  const tabInventory = document.getElementById('tab-inventory');
+  const mainContents = document.querySelectorAll('.main-content > .tab-content');
+  const buyStarsTop = document.getElementById('buy-stars-top');
+  const userAvatar = document.getElementById('user-avatar');
+  const userId = document.getElementById('user-id');
+  const userUsername = document.getElementById('user-username');
+  const userGiftsGrid = document.getElementById('user-gifts-grid');
+  const withdrawGiftBtn = document.getElementById('withdraw-gift-btn');
+  const starsCount = document.getElementById('stars-count');
+  const startExchangeBtn = document.getElementById('start-exchange-by-username');
 
-  // === ПРОВЕРКА: все ли элементы найдены ===
+  // === ПРОВЕРКА НАЛИЧИЯ ЭЛЕМЕНТОВ ===
   console.log('✅ Элементы найдены:', {
-    tabs: !!tabs.length,
-    userTab: !!userTab,
-    buyStarsBtn: !!buyStarsBtn,
-    generateLinkBtn: !!generateLinkBtn,
+    tabShop: !!tabShop,
+    tabExchange: !!tabExchange,
+    tabInventory: !!tabInventory,
+    buyStarsTop: !!buyStarsTop,
     withdrawGiftBtn: !!withdrawGiftBtn,
     userGiftsGrid: !!userGiftsGrid,
-    exchangeGiftsGrid: !!exchangeGiftsGrid,
     starsCount: !!starsCount,
+    startExchangeBtn: !!startExchangeBtn,
   });
 
-  // Если кнопки не найдены — ошибка
-  if (!generateLinkBtn || !buyStarsBtn || !withdrawGiftBtn) {
-    console.error('❌ Ошибка: не найдены кнопки. Проверь id в index.html');
-    tg.showAlert?.('Ошибка: кнопки не загружены. Проверь console.');
+  if (!tabShop || !tabInventory || !withdrawGiftBtn) {
+    console.error('❌ Критические элементы не найдены. Проверь index.html');
+    tg.showAlert?.('Ошибка: интерфейс не загружен');
     return;
   }
 
-  // === ДАННЫЕ ===
+  // === ДАННЫЕ ПОЛЬЗОВАТЕЛЯ ===
   let user = tg.initDataUnsafe.user;
-  let myGifts = JSON.parse(localStorage.getItem("myGifts") || "[]");
-  let stars = parseInt(localStorage.getItem("stars") || "100");
+  let myGifts = JSON.parse(localStorage.getItem('myGifts') || '[]');
+  let stars = parseInt(localStorage.getItem('stars') || '100');
 
   // === БАЗОВЫЙ URL БЭКА ===
   const API_BASE = 'https://bupsiserver.onrender.com';
@@ -60,137 +59,119 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.style.setProperty('--tg-border', dark ? '#444' : '#ddd');
   }
 
-  // === ОТРИСОВКА ПОДАРКОВ ===
-  function renderGiftGrids() {
-    [userGiftsGrid, exchangeGiftsGrid].forEach(grid => {
-      if (!grid) return;
-      grid.innerHTML = "";
-      if (myGifts.length === 0) {
-        grid.innerHTML = '<div class="gift-item empty"><span>Нет подарков</span></div>';
-      } else {
-        myGifts.forEach(gift => {
-          const item = document.createElement("div");
-          item.className = "gift-item";
-          item.innerHTML = `<img src="https://via.placeholder.com/60/CCCCCC/999999?text=🎁"><span>${gift.name.slice(0, 6)}${gift.name.length > 6 ? '...' : ''}</span>`;
-          grid.appendChild(item);
-        });
-      }
+  // === ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ===
+  function showTab(tabId) {
+    mainContents.forEach(content => {
+      content.classList.remove('active');
     });
+    document.getElementById(tabId)?.classList.add('active');
   }
 
-  // === СЛУШАТЕЛИ ===
-  function setupEventListeners() {
-    // --- Табы ---
-    tabs.forEach(tab => {
-      tab.addEventListener("click", () => {
-        const tabId = tab.getAttribute("data-tab");
+  tabShop.addEventListener('click', () => showTab('shop'));
+  tabExchange.addEventListener('click', () => showTab('exchange'));
+  tabInventory.addEventListener('click', () => showTab('inventory'));
 
-        if (tabId === "stars") {
-          tg.openLink("https://spend.tg/telegram-stars", { try_instant_view: false });
-          return;
-        }
+  // === КНОПКА "КУПИТЬ ЗВЁЗДЫ" (в хедере) ===
+  buyStarsTop.addEventListener('click', () => {
+    tg.openLink('https://spend.tg/telegram-stars', { try_instant_view: false });
+  });
 
-        tabs.forEach(t => t.classList.remove("active"));
-        mainContents.forEach(c => c.classList.remove("active"));
+  // === ВЫВОД ПОДАРКА ===
+  withdrawGiftBtn.addEventListener('click', () => {
+    if (myGifts.length === 0) {
+      tg.showAlert('Нет подарков для вывода');
+      return;
+    }
+    if (stars < 25) {
+      tg.showAlert('⚠️ Недостаточно звёзд: нужно 25');
+      return;
+    }
 
-        tab.classList.add("active");
-        document.getElementById(tabId)?.classList.add("active");
+    tg.showConfirm('Оплатить 25 ⭐ за вывод подарка?', async (ok) => {
+      if (ok) {
+        stars -= 25;
+        localStorage.setItem('stars', stars);
+        starsCount.textContent = stars;
+
+        const gift = myGifts.pop();
+        localStorage.setItem('myGifts', JSON.stringify(myGifts));
+
+        renderUserGifts();
+        tg.showAlert(`🎁 "${gift.name}" отправлен в ваш чат с ботом!`);
+      }
+    });
+  });
+
+  // === ОТРИСОВКА ПОДАРКОВ ===
+  function renderUserGifts() {
+    userGiftsGrid.innerHTML = '';
+    if (myGifts.length === 0) {
+      userGiftsGrid.innerHTML = '<div class="gift-item empty"><span>Нет подарков</span></div>';
+    } else {
+      myGifts.forEach(gift => {
+        const item = document.createElement('div');
+        item.className = 'gift-item';
+        item.innerHTML = `
+          <img src="https://via.placeholder.com/60/CCCCCC/999999?text=🎁" alt="Gift">
+          <span>${gift.name.length > 8 ? gift.name.slice(0, 8) + '...' : gift.name}</span>
+        `;
+        userGiftsGrid.appendChild(item);
       });
-    });
+    }
+  }
 
-    // --- Инвентарь ---
-    userTab?.addEventListener("click", () => {
-      inventory.classList.toggle("active");
-      if (inventory.classList.contains("active")) {
-        renderGiftGrids();
+  // === ВКЛАДКИ В ПРОФИЛЕ (Инвентарь / История) ===
+  document.querySelectorAll('.tabs-secondary button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tabs-secondary button').forEach(b => b.classList.remove('tab-active'));
+      btn.classList.add('tab-active');
+
+      const tabId = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      document.getElementById(tabId)?.classList.add('active');
+    });
+  });
+
+  // === НАЧАТЬ ОБМЕН ПО USERNAME (заглушка) ===
+  startExchangeBtn.addEventListener('click', () => {
+    const username = prompt('Введите username друга (без @):');
+    if (!username) return;
+    tg.showAlert('Сейчас нужно будет выбрать подарок для обмена');
+    // Здесь будет логика: отправить запрос бэкенду
+  });
+
+  // === ЗАПОЛНЕНИЕ ПРОФИЛЯ ===
+  function fillUserInfo() {
+    if (user) {
+      userId.textContent = user.id;
+      userUsername.textContent = user.username || 'не задан';
+      if (user.photo_url) {
+        userAvatar.src = user.photo_url;
+      } else {
+        userAvatar.src = 'https://via.placeholder.com/60/999/fff?text=' + (user.first_name?.[0] || '?');
       }
-    });
-
-    // --- Создать ссылку ---
-    generateLinkBtn.addEventListener("click", () => {
-      const link = `https://t.me/GiftSwapBot?startapp=exchange_${user?.id}`;
-      exchangeLinkOutput.innerHTML = `
-        <p>Отправьте ссылку другу:</p>
-        <a href="${link}" target="_blank">${link.slice(-10)}...</a>
-      `;
-    });
-
-    // --- Вывести подарок ---
-    withdrawGiftBtn.addEventListener("click", async () => {
-      if (myGifts.length === 0) {
-        tg.showAlert("Нет подарков для вывода");
-        return;
-      }
-      if (stars < 25) {
-        tg.showAlert("⚠️ Недостаточно звёзд: нужно 25");
-        return;
-      }
-      tg.showConfirm("Оплатить 25 ⭐ за вывод подарка?", async (ok) => {
-        if (ok) {
-          stars -= 25;
-          localStorage.setItem("stars", stars);
-          starsCount.textContent = stars;
-
-          const gift = myGifts.pop();
-          localStorage.setItem("myGifts", JSON.stringify(myGifts));
-
-          renderGiftGrids();
-          tg.showAlert(`🎁 "${gift.name}" отправлен в ваш чат с ботом!`);
-        }
-      });
-    });
-
-    // --- Купить звёзды ---
-    buyStarsBtn.addEventListener("click", () => {
-      tg.openLink("https://spend.tg/telegram-stars", { try_instant_view: false });
-    });
+    }
   }
 
   // === ИНИЦИАЛИЗАЦИЯ ===
   function init() {
     applyTheme();
-
-    if (user && user.photo_url) {
-      userAvatar.src = user.photo_url;
-    }
-
     starsCount.textContent = stars;
-    renderGiftGrids();
-    setupEventListeners();
+    renderUserGifts();
+    fillUserInfo();
 
-    // === Обработка start_param (обмен) ===
+    // === Обработка start_param (если пришли через ссылку) ===
     const startParam = tg.initDataUnsafe.start_param;
     if (startParam) {
       if (startParam.startsWith('exchange_')) {
-        showExchangeRequest(startParam.replace('exchange_', ''));
+        const partnerId = startParam.replace('exchange_', '');
+        tg.showAlert(`Приглашение от пользователя ID: ${partnerId}`);
+        // Логика обмена — будет позже
       } else {
-        showExchangeSession(startParam);
+        tg.showAlert(`Сессия обмена: ${startParam}`);
+        // Логика выбора подарка
       }
     }
-  }
-
-  // === Функции обмена (заглушки, пока что) ===
-  async function showExchangeRequest(partnerId) {
-    document.querySelector('.main-content').innerHTML = `
-      <div class="exchange-request">
-        <h2>🤝 Обмен с другом</h2>
-        <p>Пользователь хочет обменяться подарками с вами!</p>
-        <div id="partner-gifts-grid" class="gifts-grid"></div>
-        <button id="accept-exchange-btn" class="btn">Начать обмен</button>
-      </div>
-    `;
-    // Здесь будет логика выбора подарка
-  }
-
-  async function showExchangeSession(sessionId) {
-    document.querySelector('.main-content').innerHTML = `
-      <div class="exchange-session">
-        <h2>🎁 Выберите свой подарок</h2>
-        <div id="session-gifts-grid" class="gifts-grid"></div>
-        <button id="submit-exchange-gift" class="btn">Отправить</button>
-      </div>
-    `;
-    // Здесь будет выбор подарка
   }
 
   // === ЗАПУСК ===
