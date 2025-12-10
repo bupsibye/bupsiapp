@@ -86,39 +86,51 @@
     tg.ready();
 
     const initData = new URLSearchParams(tg.initData);
-    const startParam = initData.get('startapp');
+    const startParam = initData.get('startapp'); // например: exchange_123456789
     const myId = tg.initDataUnsafe.user.id;
 
-    const sessionId = startParam;
     const API_URL = 'https://bupsiserver.onrender.com';
+    const sessionId = startParam;
 
     const myGiftsEl = document.getElementById('myGifts');
     const partnerGiftsEl = document.getElementById('partnerGifts');
     const statusEl = document.getElementById('status');
     const confirmBtn = document.getElementById('confirmBtn');
 
+    // Поддельные подарки (в реальности можно хранить в localStorage)
+    const gifts = new Map([
+      [1, { id: 1, name: 'Плюшевый кот' }],
+      [2, { id: 2, name: 'Золотая звезда' }]
+    ]);
+    let lastGiftId = 2;
+
+    // Загрузка сессии
     async function loadSession() {
-      const res = await fetch(`${API_URL}/api/session/${sessionId}`);
-      const session = await res.json();
-      if (session.error) return;
+      try {
+        const res = await fetch(`${API_URL}/api/session/${sessionId}`);
+        const session = await res.json();
+        if (session.error) return;
 
-      const isFrom = session.fromId === myId;
-      const myGifts = isFrom ? session.fromGiftId : session.toGiftId;
-      const partnerGifts = isFrom ? session.toGiftId : session.fromGiftId;
+        const isMyTurn = session.fromId === myId;
+        const myGiftId = isMyTurn ? session.fromGiftId : session.toGiftId;
+        const partnerGiftId = isMyTurn ? session.toGiftId : session.fromGiftId;
 
-      updateGifts(myGifts, partnerGifts);
-      updateStatus(session);
+        updateGifts(myGiftId, partnerGiftId);
+        updateStatus(session);
+      } catch (err) {
+        console.error('Ошибка загрузки сессии:', err);
+      }
     }
 
     function updateGifts(myGiftId, partnerGiftId) {
       myGiftsEl.innerHTML = '<h3>Ваши подарки</h3>';
       partnerGiftsEl.innerHTML = '<h3>Подарки партнёра</h3>';
 
-      const myGift = [...window.gifts.values()].find(g => g.id == myGiftId);
-      if (myGift) {
+      if (myGiftId) {
+        const gift = gifts.get(myGiftId) || { name: 'Подарок' };
         const div = document.createElement('div');
         div.className = 'gift';
-        div.textContent = myGift.name;
+        div.textContent = gift.name;
         myGiftsEl.appendChild(div);
       }
 
@@ -136,8 +148,10 @@
         confirmBtn.disabled = true;
       } else if (session.fromConfirmed && session.toConfirmed) {
         statusEl.textContent = 'Подтверждаем...';
+      } else if (session.fromConfirmed || session.toConfirmed) {
+        statusEl.textContent = 'Ожидание подтверждения';
       } else {
-        statusEl.textContent = session.fromConfirmed || session.toConfirmed ? 'Ожидание подтверждения' : 'Выберите подарок';
+        statusEl.textContent = 'Выберите подарок';
       }
     }
 
@@ -145,33 +159,37 @@
       const name = document.getElementById('giftInput').value;
       if (!name) return;
 
-      await fetch(`${API_URL}/api/add-gift`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: myId, name })
-      });
+      lastGiftId++;
+      gifts.set(lastGiftId, { id: lastGiftId, name });
 
-      // Привязываем подарок к сессии
-      const res = await fetch(`${API_URL}/api/exchange/select-gift`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, userId: myId, giftId: window.lastGiftId || 1 })
-      });
-
-      document.getElementById('giftInput').value = '';
-      loadSession();
+      try {
+        await fetch(`${API_URL}/api/exchange/select-gift`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, userId: myId, giftId: lastGiftId })
+        });
+        document.getElementById('giftInput').value = '';
+        loadSession();
+      } catch (err) {
+        console.error('Ошибка добавления подарка:', err);
+      }
     }
 
     async function confirmExchange() {
-      await fetch(`${API_URL}/api/confirm-exchange`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, userId: myId })
-      });
-      statusEl.textContent = 'Вы подтвердили';
-      confirmBtn.disabled = true;
+      try {
+        await fetch(`${API_URL}/api/confirm-exchange`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, userId: myId })
+        });
+        statusEl.textContent = 'Вы подтвердили';
+        confirmBtn.disabled = true;
+      } catch (err) {
+        console.error('Ошибка подтверждения:', err);
+      }
     }
 
+    // Обновляем сессию каждые 3 секунды
     setInterval(loadSession, 3000);
     loadSession();
   </script>
