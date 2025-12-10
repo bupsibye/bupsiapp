@@ -169,36 +169,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const startExchangeBtn = document.getElementById("start-exchange-by-username");
   if (startExchangeBtn && user) {
     startExchangeBtn.addEventListener("click", async () => {
-      const targetUsername = prompt("Введите username пользователя:", "").trim();
+      const targetUsername = prompt("Введите username получателя:", "").trim().replace('@', '');
       if (!targetUsername) {
-        return tg?.showAlert?.("Введите username");
+        return tg?.showAlert?.("Введите username пользователя");
       }
 
       try {
-        console.log("📤 Отправка запроса на обмен:", { fromId: user.id, targetUsername });
         const res = await fetch('https://bupsiserver.onrender.com/api/start-exchange-by-username', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fromId: user.id,
             fromUsername: user.username || `user${user.id}`,
-            targetUsername: targetUsername.replace('@', '').toLowerCase()
+            targetUsername: targetUsername
           })
         });
 
-        console.log("📡 Статус ответа:", res.status);
         if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
 
         const result = await res.json();
-        console.log("📦 Результат:", result);
 
-        tg?.showAlert?.(result.success 
-          ? `✅ Запрос отправлен @${targetUsername}` 
-          : `❌ Ошибка: ${result.error}`
-        );
+        if (result.success) {
+          // Показываем ссылку для ручной отправки
+          tg.showAlert(
+            `✅ Скопируйте и отправьте эту ссылку @${targetUsername} вручную:\n\n${result.link}`
+          );
+        } else {
+          tg.showAlert(`❌ Ошибка: ${result.error}`);
+        }
       } catch (err) {
         console.error("💥 Ошибка fetch:", err);
-        tg?.showAlert?.("❌ Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.");
+        tg.showAlert(
+          "❌ Ошибка соединения с сервером.\n\n💡 Убедитесь, что:\n• Сервер запущен\n• Вы подключены к интернету"
+        );
       }
     });
   }
